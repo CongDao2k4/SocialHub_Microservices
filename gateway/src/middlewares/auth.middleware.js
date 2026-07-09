@@ -18,10 +18,8 @@ export const protectRoute = async (req, res, next) => {
       });
     }
 
-    // Verify token
     const decoded = jwt.verify(token, config.JWT_SECRET);
 
-    // Check token blacklist in Redis
     if (decoded.jti) {
       const isBlacklisted = await redis.get(`blacklist:${decoded.jti}`);
 
