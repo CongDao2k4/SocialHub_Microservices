@@ -37,5 +37,19 @@ const mapToPostService = (req, res) => {
 router.use('/posts', protectRoute, mapToPostService);
 router.use('/feed', protectRoute, mapToPostService);
 
+// --- friend-service routes ---
+const mapToFriendService = (req, res) => {
+  // friend-service routes expect /api/friends/... prefix, so we keep originalUrl
+  return httpClientService.forwardToFriendService(req, res, req.originalUrl);
+};
+router.use('/friends', protectRoute, mapToFriendService);
+
+// --- notification-service routes ---
+const mapToNotificationService = (req, res) => {
+  // notification-service routes expect /notifications/... prefix, so we strip /api
+  const targetPath = req.originalUrl.replace(/^\/api/, '');
+  return httpClientService.forwardToNotificationService(req, res, targetPath);
+};
+router.use('/notifications', protectRoute, mapToNotificationService);
 
 export default router;

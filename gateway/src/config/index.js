@@ -9,6 +9,8 @@ export const config = {
   USER_SERVICE_URL: process.env.USER_SERVICE_URL || 'http://user-service:5000',
   MEDIA_SERVICE_URL: process.env.MEDIA_SERVICE_URL || 'http://media-service:5000',
   POST_SERVICE_URL: process.env.POST_SERVICE_URL || 'http://post-service:5000',
+  FRIEND_SERVICE_URL: process.env.FRIEND_SERVICE_URL || 'http://friend-service:5000',
+  NOTIFICATION_SERVICE_URL: process.env.NOTIFICATION_SERVICE_URL || 'http://notification-service:5000',
   JWT_SECRET: process.env.JWT_SECRET || 'your-jwt-secret-change-in-production',
   REDIS_URL: process.env.REDIS_URL || 'redis://redis:6379',
   
