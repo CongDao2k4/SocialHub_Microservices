@@ -1,5 +1,5 @@
 # Sử dụng base image Node.js (Bản slim để tránh lỗi DNS của Alpine)
-FROM node:20-slim
+FROM node:18-slim
 
 # Cài đặt thư mục làm việc bên trong Container
 WORKDIR /app
@@ -18,3 +18,5 @@ EXPOSE 5000
 
 # Lệnh khởi chạy server
 CMD ["node", "src/server.js"]
+
+

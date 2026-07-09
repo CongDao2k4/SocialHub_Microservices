@@ -90,3 +90,77 @@ Nếu bạn không muốn đẩy mã nguồn lên GitHub mà muốn deploy trự
    ```bash
    vercel --prod
    ```
+
+---
+
+## 🌐 3. Kết Nối Frontend Trên Vercel Với Backend Chạy Cục Bộ (Sử Dụng Ngrok)
+
+Khi deploy giao diện lên Vercel, ứng dụng của bạn sẽ chạy trên cloud công cộng. Tuy nhiên, API Gateway và các microservices của bạn lại đang chạy trên cổng `localhost:8080` của máy cá nhân. Giao diện chạy trên Vercel không thể gọi trực tiếp tới `localhost` của bạn được.
+
+Để giải quyết vấn đề này, ta sẽ sử dụng công cụ **Ngrok** để tạo ra một đường hầm (tunnel) an toàn từ internet công cộng đi thẳng vào cổng local `8080` của bạn.
+
+### Các bước thiết lập Ngrok chi tiết:
+
+#### 1️⃣ Cài đặt Ngrok lên máy tính
+Có hai cách đơn giản để cài đặt ngrok trên máy tính của bạn:
+
+*   **Cách A: Cài đặt nhanh qua NPM (Khuyên dùng cho NodeJS developers)**
+    Mở terminal (PowerShell hoặc CMD với quyền Administrator) và chạy lệnh cài đặt toàn cục sau:
+    ```bash
+    npm install -g ngrok
+    ```
+    *Ưu điểm: Ngrok sẽ tự động cấu hình đường dẫn hệ thống (Environment Path) để bạn có thể gõ lệnh `ngrok` ở bất kỳ đâu.*
+
+*   **Cách B: Tải trực tiếp file chạy (Executable)**
+    1. Truy cập [https://ngrok.com/download](https://ngrok.com/download) và tải phiên bản phù hợp với hệ điều hành (ví dụ: file zip cho Windows).
+    2. Giải nén file tải về, bạn sẽ nhận được một tệp tin duy nhất là `ngrok.exe`.
+    3. Bạn có thể kéo file `ngrok.exe` này vào thư mục dự án SocialHub (thư mục root chứa file `docker-compose.yml`) để tiện mở terminal và chạy trực tiếp bằng lệnh:
+       - Trên Windows PowerShell: `./ngrok`
+       - Trên Windows CMD hoặc macOS: `ngrok`
+
+#### 2️⃣ Lấy và thiết lập Token xác thực (Auth Token)
+Ngrok yêu cầu một Token xác thực miễn phí để cho phép tạo đường hầm HTTPS:
+1. Đăng ký/Đăng nhập tài khoản của bạn tại website [ngrok.com](https://ngrok.com/).
+2. Truy cập tab **Your Authtoken** ở menu bên trái để lấy mã token cá nhân (một dãy ký tự dài).
+3. Chạy lệnh sau trong terminal để lưu token vào máy tính (chỉ cần làm một lần duy nhất):
+   - **Nếu cài qua Cách A**: Hoặc tải ngrok từ Microsoft Store về
+     ```bash
+     ngrok config add-authtoken <mã-token-của-bạn>
+     ```
+   - **Nếu cài qua Cách B (chạy file trực tiếp trong thư mục dự án)**:
+     ```bash
+     ./ngrok config add-authtoken <mã-token-của-bạn>
+     ```
+3. **Mở đường hầm kết nối tới API Gateway (Cổng 8080)**:
+   - Trong khi backend và gateway của bạn vẫn đang chạy bình thường, hãy mở một terminal mới và chạy lệnh tương ứng với cách cài đặt:
+     - **Nếu cài qua Cách A**:
+       ```bash
+       ngrok http 8080
+       ```
+     - **Nếu cài qua Cách B**:
+       ```bash
+       ./ngrok http 8080
+       ```
+   - Ngrok sẽ hiển thị một bảng thông tin, trong đó có mục **Forwarding** hiển thị đường dẫn HTTPS công cộng dạng:
+     `https://xxxx-xxxx.ngrok-free.app`
+   - Copy đường dẫn HTTPS này lại (đây chính là địa chỉ API Gateway công cộng của bạn).
+
+### Cấu hình biến môi trường trên Vercel:
+
+1. Vào Dashboard của **Vercel** -> Chọn dự án `socialhub-frontend` của bạn.
+2. Di chuyển sang tab **Settings** -> Chọn **Environment Variables** ở cột bên trái.
+3. Thêm một biến môi trường mới:
+   - **Key**: `VITE_API_URL` (Tên biến mà code frontend của bạn dùng để gọi api).
+   - **Value**: Dán đường dẫn HTTPS ngrok của bạn vào (ví dụ: `https://xxxx-xxxx.ngrok-free.app/api`).
+4. Click **Save**.
+5. Di chuyển sang tab **Deployments**, tìm bản build gần nhất và click chọn **Redeploy** để Vercel build lại frontend với biến môi trường mới.
+
+> [!IMPORTANT]
+> **Lưu ý bỏ qua cảnh báo của Ngrok (Ngrok Browser Warning Bypass)**:
+> Mặc định, Ngrok sẽ hiển thị một trang cảnh báo "You are about to connect to..." cho tất cả các request lần đầu qua trình duyệt. Điều này sẽ khiến các hàm fetch/axios từ frontend trên Vercel bị chặn và báo lỗi.
+> 
+> **Cách xử lý**:
+> - **Cách nhanh nhất**: Truy cập link `https://xxxx-xxxx.ngrok-free.app` trực tiếp trên trình duyệt của bạn một lần đầu tiên và click nút **Visit Site**. Trình duyệt sẽ lưu cookie xác nhận và các cuộc gọi API từ frontend sau đó sẽ hoạt động bình thường.
+> - **Cách triệt để (trong code)**: Cấu hình các request gọi API từ Axios/Fetch ở Frontend gửi kèm theo Header:
+>   `"ngrok-skip-browser-warning": "any-value"`
+>   Header này sẽ báo cho Ngrok bỏ qua trang cảnh báo và trả thẳng kết quả JSON về cho ứng dụng.
