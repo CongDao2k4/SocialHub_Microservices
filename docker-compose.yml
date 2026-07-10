@@ -225,8 +225,8 @@ services:
       - app-network
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${PG_USER:-socialhub}"]
-      interval: 10s
-      timeout: 5s
+      interval: 60s
+      timeout: 30s
       retries: 5
 
   mongo:
@@ -244,22 +244,28 @@ services:
       - app-network
     healthcheck:
       test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
-      interval: 10s
-      timeout: 5s
+      interval: 60s
+      timeout: 30s
       retries: 5
 
   redis:
     image: redis:7-alpine
+    command: redis-server --maxmemory 64mb --maxmemory-policy allkeys-lru
     ports:
       - "${REDIS_PORT:-6379}:6379"
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 128M
     volumes:
       - redis-data:/data
     networks:
       - app-network
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 5s
+      interval: 60s
+      timeout: 30s
       retries: 5
 
   minio:
@@ -270,6 +276,11 @@ services:
     environment:
       MINIO_ROOT_USER: ${MINIO_ACCESS_KEY:-socialhub_minio}
       MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY:-socialhub_minio_secret}
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
     volumes:
       - minio-data:/data
     command: server /data --console-address ":9001"
@@ -277,8 +288,8 @@ services:
       - app-network
     healthcheck:
       test: ["CMD", "mc", "ready", "local"]
-      interval: 10s
-      timeout: 5s
+      interval: 60s
+      timeout: 30s
       retries: 5
 
   rabbitmq:
@@ -289,12 +300,18 @@ services:
     environment:
       RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-socialhub}
       RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-socialhub_secret}
+      RABBITMQ_SERVER_MEMORY_AVAILABLE_LIMIT: 256
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 384M # Thêm giao diện quản lý cần nhiều RAM hơn
     networks:
       - app-network
     healthcheck:
       test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
-      interval: 10s
-      timeout: 5s
+      interval: 60s
+      timeout: 30s
       retries: 5
 
 networks:

@@ -4,7 +4,7 @@
   "description": "Post Service for Content Management",
   "main": "src/index.js",
   "scripts": {
-    "dev": "nodemon src/index.js",
+    "dev": "npx prisma db push && nodemon src/index.js",
     "start": "node src/index.js"
   },
   "type": "module",
