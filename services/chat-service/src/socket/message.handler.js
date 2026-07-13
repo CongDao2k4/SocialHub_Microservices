@@ -66,7 +66,8 @@ export default (io, socket) => {
       const messageJson = message.toJSON();
       io.to(`conv:${conversationId}`).emit('message:received', messageJson);
 
-      // Check for offline participants and publish notification events
+      // Check for offline participants and publish notification events (Disabled to prevent chat message popups)
+      /*
       const otherParticipants = conversation.participants.filter(p => p.userId !== userId);
       for (const participant of otherParticipants) {
         const isOnline = !!(await redisClient.get(`online:${participant.userId}`));
@@ -83,6 +84,7 @@ export default (io, socket) => {
           await redisPublisher.publish('message.sent', JSON.stringify(event));
         }
       }
+      */
 
     } catch (error) {
       console.error('❌ Error handling message:send:', error.message);
