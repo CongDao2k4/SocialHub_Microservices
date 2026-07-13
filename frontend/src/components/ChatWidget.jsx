@@ -15,7 +15,7 @@ const ChatWidget = () => {
     // Quản lý các ô chat đang được mở nổi dưới đáy màn hình (Mở tối đa 3 ô thoại cùng lúc)
     const [openChats, setOpenChats] = useState([]);
 
-    // 1. Tải danh sách bạn bè
+    // 1. Tải danh sách bạn bè và lắng nghe sự kiện đồng bộ từ các trang khác
     useEffect(() => {
         const fetchFriendsList = async () => {
             setIsLoading(true);
@@ -34,6 +34,11 @@ const ChatWidget = () => {
         if (currentUser) {
             fetchFriendsList();
         }
+
+        window.addEventListener("friends-updated", fetchFriendsList);
+        return () => {
+            window.removeEventListener("friends-updated", fetchFriendsList);
+        };
     }, [currentUser]);
 
     // 2. Xử lý mở một cuộc trò chuyện khi click vào người bạn
@@ -66,6 +71,46 @@ const ChatWidget = () => {
     const handleCloseChat = (conversationId) => {
         setOpenChats(prev => prev.filter(c => (c._id !== conversationId && c.id !== conversationId)));
     };
+
+    // 4. Lắng nghe sự kiện "open-chat" từ các trang khác (như Trang cá nhân)
+    useEffect(() => {
+        const handleOpenChatEvent = (e) => {
+            const friend = e.detail;
+            handleOpenChat(friend);
+        };
+        window.addEventListener("open-chat", handleOpenChatEvent);
+        return () => window.removeEventListener("open-chat", handleOpenChatEvent);
+    }, [openChats]);
+
+    // 5. Lắng nghe tin nhắn mới từ chatSocket để tự động bật popup ChatBox
+    useEffect(() => {
+        if (!chatSocket) return;
+
+        const handleIncomingMessage = async (message) => {
+            const isAlreadyOpen = openChats.some(c => c._id === message.conversationId || c.id === message.conversationId);
+            if (!isAlreadyOpen) {
+                try {
+                    const res = await api.get(`/conversations/${message.conversationId}`);
+                    if (res.data && res.data.success) {
+                        const conversation = res.data.data;
+                        setOpenChats(prev => {
+                            if (prev.some(c => c._id === conversation._id || c.id === conversation.id)) return prev;
+                            const newChats = [...prev, conversation];
+                            if (newChats.length > 3) newChats.shift();
+                            return newChats;
+                        });
+                    }
+                } catch (err) {
+                    console.error("❌ Lỗi lấy thông tin cuộc hội thoại khi có tin nhắn đến:", err);
+                }
+            }
+        };
+
+        chatSocket.on("message:received", handleIncomingMessage);
+        return () => {
+            chatSocket.off("message:received", handleIncomingMessage);
+        };
+    }, [chatSocket, openChats]);
 
     if (!currentUser) return null;
 

@@ -66,13 +66,17 @@ const Friends = () => {
         }
     };
 
-    // Tự động load dữ liệu tương ứng khi đổi Tab
+    // Tải toàn bộ danh sách khi mount để cập nhật đúng các con số đếm ngay từ đầu
     useEffect(() => {
-        setSearchResults([]); // Xóa kết quả tìm kiếm cũ khi đổi tab
+        fetchRequests();
+        fetchFriends();
+        fetchSuggestions();
+    }, []);
+
+    // Chỉ xóa ô tìm kiếm khi chuyển Tab
+    useEffect(() => {
+        setSearchResults([]);
         setSearchQuery("");
-        if (activeTab === "requests") fetchRequests();
-        if (activeTab === "list") fetchFriends();
-        if (activeTab === "suggestions") fetchSuggestions();
     }, [activeTab]);
 
     // 4. Xử lý tìm kiếm thành viên
@@ -176,6 +180,9 @@ const Friends = () => {
                         [fromUserId]: { status: "friends", requestId: null }
                     }));
                 }
+
+                // Phát sự kiện đồng bộ sidebar chat
+                window.dispatchEvent(new Event("friends-updated"));
             }
         } catch (err) {
             console.error("Chấp nhận kết bạn thất bại:", err);
@@ -188,6 +195,8 @@ const Friends = () => {
             const res = await api.put(`/friends/requests/${requestId}/reject`);
             if (res.data && res.data.success) {
                 setRequests(prev => prev.filter(r => r.id !== requestId));
+                // Phát sự kiện đồng bộ
+                window.dispatchEvent(new Event("friends-updated"));
             }
         } catch (err) {
             console.error("Từ chối kết bạn thất bại:", err);
@@ -207,6 +216,8 @@ const Friends = () => {
                         [friendId]: { status: "none", requestId: null }
                     }));
                 }
+                // Phát sự kiện đồng bộ sidebar chat
+                window.dispatchEvent(new Event("friends-updated"));
             }
         } catch (err) {
             console.error("Hủy kết bạn thất bại:", err);

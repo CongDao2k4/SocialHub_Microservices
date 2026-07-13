@@ -50,6 +50,11 @@ const Feed = () => {
         setPosts((prevPosts) => [newSharedPost, ...prevPosts]);
     };
 
+    // 4. Hàm callback khi xóa bài viết thành công (Loại bỏ bài viết ra khỏi feed)
+    const handlePostDeleted = (deletedPostId) => {
+        setPosts((prevPosts) => prevPosts.filter(p => p.id !== deletedPostId));
+    };
+
     return (
         <div className="space-y-6">
             {/* Tiêu đề trang */}
@@ -74,6 +79,7 @@ const Feed = () => {
                             post={post} 
                             currentUserId={user?.id} 
                             onPostShared={handlePostShared} 
+                            onPostDeleted={handlePostDeleted} 
                         />
                     ))}
                 </div>

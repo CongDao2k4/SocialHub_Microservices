@@ -34,6 +34,7 @@ const Profile = () => {
             const res = await api.put(`/friends/requests/${relation.requestId}/accept`);
             if (res.data && res.data.success) {
                 setRelation({ status: "friends", requestId: null });
+                window.dispatchEvent(new Event("friends-updated"));
             }
         } catch (err) {
             console.error("Chấp nhận kết bạn thất bại:", err);
@@ -46,6 +47,7 @@ const Profile = () => {
             const res = await api.put(`/friends/requests/${relation.requestId}/reject`);
             if (res.data && res.data.success) {
                 setRelation({ status: "none", requestId: null });
+                window.dispatchEvent(new Event("friends-updated"));
             }
         } catch (err) {
             console.error("Từ chối kết bạn thất bại:", err);
@@ -59,6 +61,7 @@ const Profile = () => {
             const res = await api.delete(`/friends/${id}`);
             if (res.data && res.data.success) {
                 setRelation({ status: "none", requestId: null });
+                window.dispatchEvent(new Event("friends-updated"));
             }
         } catch (err) {
             console.error("Hủy kết bạn thất bại:", err);
@@ -234,12 +237,16 @@ const Profile = () => {
                                     setUserPosts(prev => [newSharedPost, ...prev]);
                                 }
                             };
+                            const handlePostDeleted = (deletedPostId) => {
+                                setUserPosts(prev => prev.filter(p => p.id !== deletedPostId));
+                            };
                             return (
                                 <PostCard 
                                     key={post.id} 
                                     post={post} 
                                     currentUserId={loggedInUser?.id} 
                                     onPostShared={handlePostShared} 
+                                    onPostDeleted={handlePostDeleted} 
                                 />
                             );
                         })}
