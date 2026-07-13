@@ -232,3 +232,10 @@ notification-service/
    ```bash
    npm run dev
    ```
+
+---
+
+## Logging & Caching Behavior
+- **HTTP Request Logger**: All incoming API requests are logged to the console using a lightweight middleware printing the format `[HTTP] METHOD PATH STATUS - TIMEms`.
+- **Cache-Control & ETags**: ETags are disabled (`app.set('etag', false)`) and response headers are set to `Cache-Control: no-store, no-cache, must-revalidate, proxy-revalidate` to prevent browser caching of dynamic notifications and unread counts, forcing fresh loads on every call.
+- **RabbitMQ Consumer Resilience**: Requeuing infinite loop fixes are applied to prevent process lockups in the event of payload processing exceptions.

@@ -73,3 +73,7 @@ post-service/
 | `REDIS_URL`          | Redis connection string              | redis://localhost:6379                |
 | `USER_SERVICE_URL`   | Internal URL to user-service         | http://user-service:5000              |
 | `MEDIA_SERVICE_URL`  | Internal URL to media-service        | http://media-service:5000             |
+
+## Logging & Caching Behavior
+- **HTTP Request Logger**: All incoming API requests are logged to the console using a lightweight middleware printing the format `[HTTP] METHOD PATH STATUS - TIMEms`.
+- **Cache-Control & ETags**: ETags are disabled (`app.set('etag', false)`) and response headers are set to `Cache-Control: no-store, no-cache, must-revalidate, proxy-revalidate` to prevent caching of posts, feeds, and comments on client browsers, forcing fresh loads on every call.

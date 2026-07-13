@@ -4,8 +4,29 @@ import notificationRoutes from './routes/notification.routes.js';
 
 const app = express();
 
+// Disable ETag generation to prevent 304 responses
+app.set('etag', false);
+
 app.use(cors());
 app.use(express.json());
+
+// Custom HTTP Request Logger Middleware
+app.use((req, res, next) => {
+  const start = Date.now();
+  res.on('finish', () => {
+    const duration = Date.now() - start;
+    console.log(`[HTTP] ${req.method} ${req.originalUrl} ${res.statusCode} - ${duration}ms`);
+  });
+  next();
+});
+
+// Cache Control Middleware to prevent client caching
+app.use((req, res, next) => {
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
+  next();
+});
 
 // Public health check endpoint
 app.get('/health', (req, res) => {

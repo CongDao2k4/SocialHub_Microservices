@@ -171,3 +171,9 @@ Khi hệ thống đang chạy, bạn có thể truy cập giao diện web của 
 3. File được tổ chức theo cấu trúc: `{userId}/{uuid}.{ext}`
 
 > **Lưu ý:** Cổng `9000` là cổng API dành cho code (không dùng trực tiếp). Cổng `9001` là giao diện quản trị web.
+
+---
+
+## Logging & Caching Behavior
+- **HTTP Request Logger**: All incoming API requests are logged using `morgan('dev')`.
+- **Cache-Control & ETags**: ETags are disabled (`app.set('etag', false)`). Metadata API responses are set to `Cache-Control: no-store` to prevent browser caching. Public binary streams (`/media/file/:id`) bypass this control and use a long-lived caching header (`Cache-Control: public, max-age=86400`) to optimize image loading performance.

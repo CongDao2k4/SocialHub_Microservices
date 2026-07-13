@@ -115,6 +115,12 @@ const chatServiceBreaker = new CircuitBreaker(
 function handleFallback(serviceName, res, error) {
   console.error(`[ERROR] Circuit Breaker Triggered or Error occurred for ${serviceName}:`, error.message);
 
+  if (res.headersSent) {
+    console.warn(`[WARN] Headers already sent for ${serviceName}, destroying response stream to prevent crash.`);
+    res.destroy();
+    return;
+  }
+
   res.status(503).json({
     success: false,
     error: 'Service Temporarily Unavailable',

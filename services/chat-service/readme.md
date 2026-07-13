@@ -131,3 +131,9 @@ chat-service/
 | `JWT_SECRET`       | Khóa bí mật giải mã JWT token     | —                                 |
 | `USER_SERVICE_URL` | URL gọi nội bộ user-service       | `http://user-service:5000`        |
 | `MEDIA_SERVICE_URL`| URL gọi nội bộ media-service      | `http://media-service:5000`       |
+
+## Logging & Caching Behavior
+- **HTTP Request Logger**: All incoming API requests are logged to the console using a lightweight middleware printing the format `[HTTP] METHOD PATH STATUS - TIMEms`.
+- **Socket.IO Logging**: WebSockets connection and action events (such as `message:send`, `message:read`, `typing:start`, and room joining) are logged in real-time.
+- **Cache-Control & ETags**: ETags are disabled (`app.set('etag', false)`) and response headers are set to `Cache-Control: no-store, no-cache, must-revalidate, proxy-revalidate` to prevent browser caching of dynamic message history.
+- **Message Notification Alerts**: The publishing of `message.sent` events to Redis/RabbitMQ is disabled to prevent intrusive alert toasts during chat sessions, relying instead on dynamic unread status dot markers.

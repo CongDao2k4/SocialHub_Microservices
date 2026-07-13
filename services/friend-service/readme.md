@@ -70,3 +70,7 @@ friend-service/
 | `REDIS_PORT`       | Redis server port                   | 6379                                 |
 | `JWT_SECRET`       | Secret key to verify JWT            | your-jwt-secret-change-in-production |
 | `USER_SERVICE_URL` | Internal URL of user service        | http://localhost:5001                |
+
+## Logging & Caching Behavior
+- **HTTP Request Logger**: All incoming API requests are logged to the console using a lightweight middleware printing the format `[HTTP] METHOD PATH STATUS - TIMEms`.
+- **Cache-Control & ETags**: ETags are disabled (`app.set('etag', false)`) and response headers are set to `Cache-Control: no-store, no-cache, must-revalidate, proxy-revalidate` to prevent caching of friendship and request lists on client browsers, forcing fresh loads on every call.

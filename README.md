@@ -369,3 +369,20 @@ Khởi tạo kết nối Socket.IO tới Gateway:
 - **Sự kiện lắng nghe**:
   - `notification:new`: Nhận thông báo đẩy thời gian thực ngay khi có tương tác (like, comment, gửi lời mời kết bạn, nhắn tin...).
   - `notification:count`: Nhận cập nhật số lượng thông báo chưa đọc mỗi khi thay đổi.
+
+---
+
+## 🛡️ Cấu Hình Logging, Cache-Control & Khả Năng Kháng Lỗi (Resilience Matrix)
+
+Để tối ưu hóa hoạt động và đảm bảo tính nhất quán trên môi trường production (như Vercel và các máy local), hệ thống đã thiết lập cấu hình:
+
+1.  **Vô hiệu hóa ETag & Client Caching (Khắc phục lỗi 304)**:
+    - Tất cả các Microservices (`user`, `friend`, `post`, `media`, `chat`, `notification`) và **API Gateway** đều tắt tính năng tự động tạo mã băm ETag của Express (`app.set('etag', false)`).
+    - Tích hợp middleware ghi đè các header Cache-Control:
+      `Cache-Control: no-store, no-cache, must-revalidate, proxy-revalidate`
+      Điều này buộc client browser và các server trung gian luôn truy vấn dữ liệu trực tiếp, trả về mã trạng thái `200 OK` thay vì dùng lại cache cũ `304 Not Modified` (gây stale views). Riêng các luồng stream file thô (`/media/file/:id`) được miễn trừ để duy trì hiệu năng tải ảnh.
+2.  **Chuẩn hóa Console Logging**:
+    - Tất cả các microservices hiện đều tích hợp log HTTP request gọn nhẹ in trực tiếp ra console mỗi khi có API được gọi, dạng: `[HTTP] METHOD PATH STATUS - TIMEms` (ví dụ: `[HTTP] GET /api/friends/requests 200 - 12ms`).
+3.  **Kháng lỗi tại API Gateway (Circuit Breaker Resilience)**:
+    - **WebSocket Disconnection Protection**: Thêm bộ lọc lỗi `.on('error', ...)` cho Client socket và Proxy socket trong luồng proxy WebSockets thủ công tại `server.js`, ngăn việc Gateway bị sập tiến trình (crashed) khi người dùng ngắt kết nối mạng hoặc đóng tab đột ngột (`ECONNRESET`).
+    - **Header Sent Stream Protection**: Trong dịch vụ HTTP Client, hàm fallback Circuit Breaker sẽ kiểm tra điều kiện `res.headersSent` trước khi phản hồi lỗi `503`. Nếu headers đã gửi đi (ví dụ khi đang truyền stream dữ liệu media dở dang thì đứt mạng), hệ thống sẽ ngắt stream và bỏ qua ghi đè status để tránh quăng lỗi crash `ERR_HTTP_HEADERS_SENT`.

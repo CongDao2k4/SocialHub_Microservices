@@ -6,6 +6,9 @@ import mediaRoutes from './routes/media.routes.js';
 
 const app = express();
 
+// Disable ETag generation to prevent 304 responses
+app.set('etag', false);
+
 // Middlewares
 app.use(helmet());
 // Configure CORS for direct browser upload
@@ -18,6 +21,17 @@ const corsOptions = {
 app.use(cors(corsOptions));
 app.use(morgan('dev'));
 app.use(express.json());
+
+// Global Cache-Control disabling middleware for metadata endpoints (exempting public binary stream)
+app.use((req, res, next) => {
+  if (req.path.startsWith('/media/file/') || req.path.startsWith('/file/')) {
+    return next();
+  }
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
+  next();
+});
 
 // Routes
 app.use('/', mediaRoutes);

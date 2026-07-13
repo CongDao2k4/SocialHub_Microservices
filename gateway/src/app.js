@@ -8,10 +8,22 @@ import { rateLimiter } from './middlewares/rate-limiter.middleware.js';
 
 const app = express();
 
+// Disable ETag generation to prevent 304 Not Modified responses
+app.set('etag', false);
+
 app.use(helmet({
   contentSecurityPolicy: false,
 }));
 app.use(cors());
+
+// Global Cache-Control disabling middleware
+app.use((req, res, next) => {
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
+  next();
+});
+
 app.use(morgan('dev'));
 
 app.get('/health', (req, res) => {
