@@ -119,5 +119,5 @@
 #       - name: Triển khai các cấu hình và tài nguyên lên GKE
 #         run: |
 #           kubectl apply -f k8s/configmap.yaml
-#           kubectl apply -f k8s/secrets.yaml
 #           kubectl apply -f k8s/
+
