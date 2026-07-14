@@ -82,19 +82,27 @@ api.interceptors.response.use(
     },
     async (error) => {
         const originalRequest = error.config;
+        if (!originalRequest) return Promise.reject(error);
 
         // Kiểm tra xem request có phải là request xác thực không
-        const isAuthRequest = originalRequest.url.includes("/auth/login") ||
+        const isAuthRequest = originalRequest.url && (
+            originalRequest.url.includes("/auth/login") ||
             originalRequest.url.includes("/auth/refresh") ||
-            originalRequest.url.includes("/auth/register");
+            originalRequest.url.includes("/auth/register")
+        );
 
         // Chỉ cố gắng refresh token cho các request KHÔNG phải xác thực bị lỗi 401
         if (error.response?.status === 401 && !originalRequest._retry && !isAuthRequest) {
             originalRequest._retry = true;
             try {
-
                 const refreshToken = localStorage.getItem("refreshToken");
-                if (!refreshToken) throw new Error("No refresh token available");
+                if (!refreshToken) {
+                    localStorage.removeItem("accessToken");
+                    if (window.location.pathname !== "/login") {
+                        window.location.href = "/login";
+                    }
+                    return Promise.reject(error);
+                }
 
                 // Gọi API refresh token
                 const res = await axios.post(`${getBaseURL()}/auth/refresh`, {
@@ -120,7 +128,9 @@ api.interceptors.response.use(
                 // Xóa token và buộc logout
                 localStorage.removeItem("accessToken");
                 localStorage.removeItem("refreshToken");
-                window.location.href = "/login";
+                if (window.location.pathname !== "/login") {
+                    window.location.href = "/login";
+                }
             }
         }
         return Promise.reject(error);
