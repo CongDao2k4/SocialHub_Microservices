@@ -60,6 +60,8 @@ const resolveUrls = (obj) => {
                     // Thêm tham số thời gian để tránh trình duyệt cache ảnh đại diện
                     resolvedUrl += (resolvedUrl.includes("?") ? "&" : "?") + `t=${Date.now()}`;
 
+                    console.log(`[AVATAR_RESOLVER] Key: "${key}", Original: "${val}", Resolved: "${resolvedUrl}"`);
+
                     obj[key] = resolvedUrl;
                 }
             } else if (typeof val === "object" && val !== null) {

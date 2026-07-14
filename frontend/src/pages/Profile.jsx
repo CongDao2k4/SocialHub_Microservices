@@ -39,22 +39,33 @@ const EditProfileModal = ({ profileUser, onClose, onProfileUpdated }) => {
                 setIsUploading(true);
                 const formData = new FormData();
                 formData.append("file", avatarFile);
+                console.log("[PROFILE_UPDATE] Uploading avatar file:", avatarFile.name);
                 const uploadRes = await api.post("/media/upload", formData, {
                     headers: { "Content-Type": "multipart/form-data" }
                 });
                 
                 if (uploadRes.data && uploadRes.data.id) {
                     uploadedAvatarUrl = `/media/file/${uploadRes.data.id}`;
+                    console.log("[PROFILE_UPDATE] Avatar uploaded successfully, relative path:", uploadedAvatarUrl);
+                } else {
+                    console.warn("[PROFILE_UPDATE] Upload succeeded but no ID returned:", uploadRes.data);
                 }
                 setIsUploading(false);
             }
 
             // 2. Cập nhật profile người dùng qua user-service
+            console.log(`[PROFILE_UPDATE] Sending update request for user ${profileUser.id}:`, {
+                name: displayName.trim(),
+                bio: bio.trim(),
+                avatarUrl: uploadedAvatarUrl
+            });
             const updateRes = await api.put(`/users/${profileUser.id}`, {
                 name: displayName.trim(),
                 bio: bio.trim(),
                 avatarUrl: uploadedAvatarUrl
             });
+
+            console.log("[PROFILE_UPDATE] Update response received:", updateRes.data);
 
             if (updateRes.data && updateRes.data.success) {
                 onProfileUpdated(updateRes.data.user);
