@@ -1,6 +1,6 @@
 # Kiến Trúc Triển Khai Hệ Thống Trên Google Cloud Platform (GCP)
 
-Tài liệu này mô tả chi tiết kiến trúc triển khai thực tế (Production-ready) cấp doanh nghiệp cho hệ thống **SocialHub Microservices** trên hạ tầng đám mây **Google Cloud Platform (GCP)**.
+Tài liệu này mô tả chi tiết kiến trúc triển khai thực tế tối ưu hóa chi phí (Production-ready & Dev-optimized) cho hệ thống **SocialHub Microservices** trên hạ tầng đám mây **Google Cloud Platform (GCP)**.
 
 ---
 
@@ -10,142 +10,125 @@ Tài liệu này mô tả chi tiết kiến trúc triển khai thực tế (Prod
 flowchart TD
     subgraph Internet ["Internet Công Cộng"]
         Client["Trình duyệt / Mobile App"]
+        GitHub["GitHub Repository"]
     end
 
     subgraph GCP ["Hạ tầng Google Cloud Platform (GCP)"]
-        subgraph Security ["1. Lớp Bảo mật & Biên (Edge)"]
-            Armor["Google Cloud Armor (WAF & Anti-DDoS)"]
-            DNS["Cloud DNS (Quản lý tên miền)"]
-            GLB["External Application Load Balancer (GLB)"]
+        subgraph Security ["1. Cổng Kết Nối & Bảo Mật (VPC Edge)"]
+            LB["Service LoadBalancer (API Gateway)"]
+            WIF["Workload Identity Federation (WIF)"]
         end
 
-        subgraph VPC ["2. Mạng VPC Nội Bộ (VPC Private Subnet)"]
-            subgraph GKE_Autopilot ["Google Kubernetes Engine (GKE Cluster)"]
-                Gateway["api-gateway pods"]
-                UserService["user-service pods"]
-                FriendService["friend-service pods"]
-                PostService["post-service pods"]
-                MediaService["media-service pods"]
-                NotificationService["notification-service pods"]
-                ChatService["chat-service pods (Đang phát triển)"]
-                RabbitMQ["RabbitMQ Cluster (via Operator)"]
+        subgraph VPC ["2. Mạng VPC Nội Bộ (socialhub-vpc)"]
+            subgraph GKE_Autopilot ["Google GKE Autopilot Cluster (Spot VM Node Pool)"]
+                Gateway["api-gateway pod"]
+                UserService["user-service pod"]
+                FriendService["friend-service pod"]
+                PostService["post-service pod"]
+                MediaService["media-service pod"]
+                NotificationService["notification-service pod"]
+                ChatService["chat-service pod"]
+                
+                %% Các thành phần chạy nội bộ trong GKE để tiết kiệm chi phí
+                RabbitMQ["RabbitMQ pod (Spot)"]
+                RedisPod["Redis pod (Spot)"]
             end
 
-            subgraph Database_Layer ["3. Lớp Dữ liệu & Lưu trữ (Managed Services)"]
-                CloudSQL["Cloud SQL for PostgreSQL (HA Mode)"]
-                Memorystore["Memorystore for Redis (HA Cache & Blacklist)"]
-                GCS["Google Cloud Storage (GCS bucket)"]
+            subgraph Database_Layer ["3. Lớp Dữ Liệu Ngoại Vi (Private Access Only)"]
+                CloudSQL["Cloud SQL for PostgreSQL (Zonal Dev Mode)"]
+                GCS["Google Cloud Storage (GCS Bucket)"]
+                %% Memorystore["Memorystore for Redis (Tùy chọn cho Production)"]
             end
         end
 
-        subgraph Mongo_Atlas_Cloud ["4. Lớp Cloud Đối Tác"]
-            MongoAtlas["MongoDB Atlas on GCP (VPC Peering)"]
+        subgraph CloudBuildLayer ["4. Pipeline Tích Hợp (CI/CD)"]
+            CloudBuild["Cloud Build Worker (E2_HIGHCPU_8)"]
+            GAR["Artifact Registry (Docker Repo)"]
+            DevConnect["Developer Connect (2nd gen)"]
         end
     end
 
-    %% Luồng kết nối chính
-    Client -->|HTTPS / WSS| Armor
-    Armor --> GLB
-    GLB -->|WebSocket / HTTP| Gateway
-    
-    %% Gateway điều hướng nội bộ
-    Gateway -->|Internal K8s DNS| UserService
-    Gateway -->|Internal K8s DNS| FriendService
-    Gateway -->|Internal K8s DNS| PostService
-    Gateway -->|Internal K8s DNS| MediaService
-    Gateway -->|Internal K8s DNS| NotificationService
-    Gateway -->|Internal K8s DNS| ChatService
+    subgraph Partner_Cloud ["5. Cloud Đối Tác"]
+        MongoAtlas["MongoDB Atlas on GCP"]
+    end
 
-    %% Kết nối database nội bộ
-    UserService & FriendService & PostService & ChatService ===> CloudSQL
-    UserService & FriendService & PostService & ChatService & NotificationService ===> Memorystore
-    MediaService ===> GCS
-    MediaService & NotificationService & ChatService ===> MongoAtlas
-    NotificationService & ChatService ===> RabbitMQ
+    %% Luồng yêu cầu của Client
+    Client -->|HTTP / WebSocket / 8080| LB
+    LB --> Gateway
+
+    %% Điều phối của API Gateway
+    Gateway -->|Port 5000 / K8s DNS| UserService
+    Gateway -->|Port 5000 / K8s DNS| FriendService
+    Gateway -->|Port 5000 / K8s DNS| PostService
+    Gateway -->|Port 5000 / K8s DNS| MediaService
+    Gateway -->|Port 5000 / K8s DNS| NotificationService
+    Gateway -->|Port 5000 / K8s DNS| ChatService
+
+    %% Kết nối Database & Message Broker nội bộ
+    UserService & FriendService & PostService & ChatService ===>|IP Private 10.128.0.2| CloudSQL
+    PostService & ChatService & NotificationService & Gateway ===>|K8s DNS redis:6379| RedisPod
+    NotificationService & ChatService ===>|K8s DNS rabbitmq:5672| RabbitMQ
+    MediaService ===>|HTTPS API| GCS
+    NotificationService & ChatService & MediaService ===>|Atlas URI| MongoAtlas
+
+    %% Luồng CI/CD
+    GitHub -->|1. Push Code / Trigger| DevConnect
+    DevConnect --> CloudBuild
+    CloudBuild -->|Build & Push| GAR
+    CloudBuild -->|Deploy Manifests| GKE_Autopilot
+
+    GitHub -->|2. Push Code / OIDC| WIF
+    WIF -->|Impersonate Service Account| GAR
+    WIF -->|Deploy Manifests| GKE_Autopilot
 ```
 
 ---
 
 ## 🛠️ 2. Chi Tiết Lựa Chọn Thành Phần & Công Nghệ
 
-Hệ thống được thiết kế để chịu tải lớn, sẵn sàng tự động phục hồi khi gặp sự cố mà không cần can thiệp thủ công:
+Hệ thống được thiết kế theo nguyên tắc **Tối ưu hóa chi phí môi trường phát triển (Dev) mà vẫn sẵn sàng chuyển đổi nhanh chóng lên Production (Prod-ready)**:
 
 ### A. Lớp Tính toán & Mở rộng (Compute)
-*   **Google Kubernetes Engine (GKE) Autopilot**:
-    *   **Tại sao dùng?**: GKE Autopilot tự động quản lý hạ tầng (Node provisioning), tự động cấu hình bảo mật chuẩn GCP, tối ưu chi phí (chỉ tính tiền trên tài nguyên thực tế pod sử dụng).
-    *   **Khả năng co giãn (Auto-scaling)**: Sử dụng **Horizontal Pod Autoscaler (HPA)** để tự động tăng số lượng pods của từng service (ví dụ: nhân bản `post-service` lên 10 pods) khi lượng request hoặc CPU tăng đột biến, sau đó tự động giảm khi hết tải.
-    *   **Private VPC Isolation**: Toàn bộ pods chạy trong dải IP private không lộ ra ngoài internet, tránh bị tấn công trực tiếp.
+*   **Google GKE Autopilot Cluster (Spot VM Node Pool)**:
+    *   **Tối ưu chi phí (Spot VMs)**: Toàn bộ các Pod của ứng dụng được cấu hình gán nhãn `nodeSelector` và `tolerations` cho `gke-spot: "true"`. GKE Autopilot sẽ tự động lập lịch và chạy các Pod này trên các máy ảo chạy tài nguyên dư thừa (Spot VMs) của Google, giúp giảm **60-90% chi phí phần cứng**.
+    *   **Tạm dừng (Scale-to-Zero)**: Khi kết thúc thời gian phát triển trong ngày hoặc không kiểm thử, có thể hạ số lượng Pod về `0` (ví dụ: `kubectl scale deployment --all --replicas=0`). GKE sẽ tự động giải phóng toàn bộ máy ảo và bạn sẽ không bị tính tiền phần cứng khi hệ thống không chạy.
+*   **API Gateway Service (Type: LoadBalancer)**:
+    *   Ứng dụng sử dụng một cổng LoadBalancer trực tiếp kết nối tới Gateway pod để giữ cấu trúc mạng đơn giản và tiết kiệm chi phí dịch vụ Load Balancer so với việc sử dụng Google Cloud HTTPS Application Load Balancer đắt đỏ khi dev.
 
-### B. Lớp Dữ liệu & State (Managed Databases)
+### B. Lớp Dữ liệu & State (Databases & Messaging)
 *   **Google Cloud SQL (PostgreSQL)**:
-    *   Cấu hình ở chế độ **High Availability (HA)**: Một database chính (Master) ở Zone A và một database phụ (Standby) ở Zone B đồng bộ dữ liệu thời gian thực. Nếu Zone A gặp thảm họa, GCP tự động chuyển hướng kết nối sang Zone B trong vài giây (Zero data loss).
-*   **Google Cloud Memorystore (Redis)**:
-    *   Làm nơi lưu trữ cache mạng lưới bạn bè và **Blacklist JWT Token** từ `gateway`.
-    *   Cấu hình HA đa vùng giúp tăng tốc độ đọc dữ liệu lên tới hàng trăm ngàn requests/giây với độ trễ < 1ms.
+    *   Được cấu hình ở chế độ **Zonal (Đơn vùng)**, phiên bản PostgreSQL 16 và sử dụng máy ảo nhỏ nhất dành cho môi trường Dev (`db-custom-1-3840`).
+    *   Hỗ trợ tính năng **Tạm dừng hoạt động (Stop Instance)** qua CLI thông qua chính sách hoạt động (`--activation-policy=NEVER`) khi không sử dụng giúp dừng phát sinh chi phí tính toán (chỉ tính phí lưu trữ ổ đĩa cứng cực thấp).
+*   **Redis Pod (Chạy trực tiếp trong GKE)**:
+    *   Thay vì sử dụng Google Cloud Memorystore for Redis (dịch vụ có giá thuê khá đắt đỏ, từ $15-30/tháng và không có tính năng tạm dừng), hệ thống triển khai một Pod Redis riêng chạy trực tiếp trong cụm GKE ([k8s/redis.yaml](file:///d:/Hoc_tap_Project_complete/SocialHub_Microservices/k8s/redis.yaml)).
+    *   Redis Pod được gán chạy trên Spot VM, giúp bạn có môi trường Cache & Blacklist JWT hoàn toàn miễn phí.
+*   **RabbitMQ Pod (Chạy trực tiếp trong GKE)**:
+    *   Hàng đợi tin nhắn được triển khai qua tệp [k8s/rabbitmq.yaml](file:///d:/Hoc_tap_Project_complete/SocialHub_Microservices/k8s/rabbitmq.yaml) bên trong cụm GKE, giúp giải quyết việc trao đổi sự kiện realtime cho `notification-service` và `chat-service` mà không cần thuê máy chủ hoặc cài đặt phức tạp.
 *   **Google Cloud Storage (GCS)**:
-    *   Thay thế hoàn toàn MinIO để lưu trữ ảnh, video tải lên từ `media-service`.
-    *   Tích hợp sẵn tính năng tự động sao lưu địa lý (Multi-regional replication) và bảo mật IAM cao cấp.
-*   **MongoDB Atlas (GCP Partner integration)**:
-    *   Cơ sở dữ liệu NoSQL lưu thông báo và bài viết, được thiết lập VPC Peering trực tiếp với mạng VPC của GKE để bảo mật hoàn toàn và có độ trễ cực thấp.
-
-### C. Lớp Mạng & An Ninh (Security & Edge)
-*   **External Application Load Balancer (GLB)**:
-    *   Hỗ trợ SSL Offloading (quản lý chứng chỉ HTTPS tại Load Balancer, giải phóng tài nguyên mã hóa cho ứng dụng phía sau).
-    *   Hỗ trợ chuyển tiếp WebSocket streams nguyên bản cho `notification-service` và `chat-service`.
-*   **Google Cloud Armor**:
-    *   Bộ lọc tường lửa ứng dụng web (WAF) ngăn chặn tấn công Top 10 OWASP (SQL Injection, XSS) và chống tấn công từ chối dịch vụ (DDoS) quy mô lớn.
+    *   Sử dụng GCS Bucket ở dạng Single-Region (`asia-east1`) thay thế cho dịch vụ MinIO tự chạy. GCS cung cấp khả năng tương thích cao với S3 XML API để `media-service` xử lý tải ảnh/video dễ dàng.
+*   **MongoDB Atlas (GCP Partner Integration)**:
+    *   Dịch vụ MongoDB được triển khai trên nền tảng đám mây của Atlas tích hợp sẵn trên hạ tầng Google Cloud, sử dụng gói Free Tier (M0) giúp tối ưu hóa chi phí cho dự án phát triển.
 
 ---
 
-## 🌐 3. Chiến Lược Quản Lý Tên Miền & SSL (Khi Chưa Có Domain)
+## 🤖 3. Quy Trình Tự Động Hóa CI/CD
 
-Do hệ thống hiện tại **chưa có tên miền riêng**, chúng ta sẽ áp dụng chiến lược chuyển tiếp cấu hình linh hoạt:
+SocialHub hỗ trợ hai phương án tích hợp và triển khai liên tục (CI/CD) bảo mật, độc lập và linh hoạt:
 
-1.  **Giai đoạn Thử nghiệm & Phát triển (Không tốn chi phí)**:
-    *   Sau khi tạo **External Application Load Balancer**, Google Cloud sẽ cấp cho bạn một **IP Public tĩnh** (ví dụ: `35.244.12.34`).
-    *   **Cấu hình DNS giả lập (Local DNS Mapping)**: 
-        Người dùng/Developer chỉ cần trỏ IP tĩnh này vào file `/etc/hosts` (hoặc `C:\Windows\System32\drivers\etc\hosts` trên Windows) để mô phỏng tên miền thật:
-        ```text
-        35.244.12.34  socialhub.com
-        35.244.12.34  api.socialhub.com
-        ```
-        Lúc này, bạn có thể truy cập `http://socialhub.com` từ trình duyệt của mình như một trang web thực sự mà không cần mua tên miền.
-2.  **Giai đoạn Production (Có tên miền thật)**:
-    *   Mua tên miền trên Google Domains, Namecheap, Cloudflare...
-    *   Trỏ bản ghi tên miền (A Record) về IP tĩnh của Load Balancer.
-    *   Sử dụng **Google Certificate Manager** để tự động tạo, gia hạn chứng chỉ SSL bảo mật HTTPS (`https://`) miễn phí của Let's Encrypt.
+### 🟢 Cách 1: Google Cloud Build (Tích hợp All-in-GCP)
+*   **Kết nối bảo mật (Developer Connect - 2nd gen)**: Sử dụng kết nối bảo mật thế hệ mới của Google để liên kết tài khoản GitHub mà không cần lưu trữ key.
+*   **Máy ảo cấu hình cao (High-CPU Build Worker)**: Khi có sự kiện push code lên nhánh `main`, Cloud Build sẽ khởi tạo máy ảo cấu hình mạnh `E2_HIGHCPU_8` tại vùng `asia-east1`. Máy ảo này hỗ trợ build Docker song song cho **7 microservices đồng thời**, giúp giảm thời gian build từ 15-20 phút xuống chỉ còn **dưới 3 phút**.
+*   **Tích hợp an toàn**: Toàn bộ luồng kéo code, build Docker, push vào **Artifact Registry (GAR)** và triển khai lên **GKE** diễn ra khép kín trong hạ tầng Google Cloud.
+
+### 🔵 Cách 2: GitHub Actions (Tích hợp qua WIF)
+*   **Workload Identity Federation (WIF)**: Cơ chế xác thực không dùng khóa (Keyless). GitHub Actions sẽ tự động đổi Identity Token của GitHub lấy mã truy cập ngắn hạn (OAuth token) của GCP từ WIF. Điều này giúp loại bỏ hoàn toàn rủi ro bị lộ file khóa JSON (Service Account Key) trên mạng Internet.
+*   **Parallel Runner**: Tận dụng 7 máy ảo miễn phí chạy song song của GitHub Actions để chạy build song song cho từng service.
+*   **Dedicated Service Account (`socialhub-build-sa`)**: Sử dụng tài khoản dịch vụ do người dùng quản lý riêng, được phân quyền tối thiểu (Least Privilege) chỉ gồm ghi log, đẩy ảnh lên GAR và ra lệnh deploy lên cụm GKE, tăng mức độ an toàn thông tin cho toàn hệ thống.
 
 ---
 
-## 💬 4. Giải Pháp Co Giãn WebSocket Cho Dịch Vụ Realtime (Notification & Chat)
+## 🔒 4. Cơ Chế Bảo Mật Mạng (VPC Isolation)
 
-Khi hệ thống triển khai trên GKE, các dịch vụ truyền tải dữ liệu thời gian thực như `notification-service` và `chat-service` (đang phát triển) sẽ chạy nhiều replica (nhiều pod đồng thời). 
-
-### Vấn đề:
-Nếu User A kết nối Socket.IO tới Pod 1, còn User B kết nối tới Pod 2: khi User A gửi tin nhắn cho User B, Pod 1 sẽ không tìm thấy kết nối của User B để đẩy tin nhắn thời gian thực.
-
-### Giải pháp:
-1.  **Redis Adapter (`@socket.io/redis-adapter`)**:
-    *   Tất cả các pod `notification-service` và `chat-service` được cấu hình kết nối chung tới cụm **Redis Memorystore**.
-    *   Khi có sự kiện đẩy thông tin, adapter sẽ pub sự kiện qua Redis Pub/Sub đến toàn bộ các pod khác. Pod chứa socket của User B sẽ nhận được và đẩy dữ liệu xuống client.
-2.  **Session Affinity (Sticky Sessions)**:
-    *   Cấu hình Load Balancer sử dụng cookie hoặc client IP affinity để giữ client kết nối cố định vào một pod duy nhất trong suốt phiên làm việc, tránh việc bắt tay WebSocket bị đứt đoạn hoặc chuyển pod liên tục.
-
----
-
-## 🤖 5. Quy Trình Tự Động Hóa CI/CD (Google Cloud Build & Cloud Deploy)
-
-Hệ thống CI/CD được xây dựng bằng công cụ chính hãng của Google Cloud để đảm bảo tốc độ và sự bảo mật tối đa:
-
-```
-[Mã nguồn GitHub]
-      │ (git push / Merge PR)
-      ▼
-[Google Cloud Build] ──> (Build & Push Docker) ──> [Google Artifact Registry]
-      │
-      ▼
-[Google Cloud Deploy] ──> (Pipeline Release) ──> [GKE Autopilot (Deploy Pods)]
-```
-
-*   **Google Cloud Build**: Tự động lắng nghe sự kiện push code từ GitHub, build Docker Image bằng file Dockerfile tối ưu của từng service, gắn nhãn phiên bản (tag) và đẩy vào **Artifact Registry (GAR)**.
-*   **Google Cloud Deploy**: Quản lý vòng đời release sản phẩm. Nó sẽ lấy manifest của GKE, tự động thay thế Image Tag mới nhất, chạy thử nghiệm môi trường Staging/Dev, yêu cầu phê duyệt (Approvals) trước khi đẩy bản cập nhật chính thức lên cụm GKE Production mà không gây mất kết nối (Zero Downtime).
+*   **VPC Private Subnet Only**: Cụm GKE Autopilot và Database Cloud SQL kết nối với nhau thông qua cơ chế **Private Service Access** trên dải mạng nội bộ `socialhub-vpc`. Không có bất kỳ thành phần database nào mở cổng kết nối ra ngoài Internet công cộng.
+*   **Định tuyến nội bộ qua DNS**: Các microservice giao tiếp với nhau bằng tên miền nội bộ của Kubernetes (ví dụ: `http://user-service:5000`) thông qua dịch vụ Kube-DNS của cụm.
+*   **Cloud NAT**: Các Pod trong GKE không có IP Public nhưng vẫn có thể tải thư viện ngoài (như `npm install` hoặc kết nối MongoDB Atlas) nhờ thiết lập cổng dịch vụ **Cloud NAT** và **Cloud Router** để chuyển dịch địa chỉ nguồn an toàn.

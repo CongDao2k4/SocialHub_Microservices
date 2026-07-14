@@ -122,6 +122,21 @@ Theo chuẩn mới nhất của Google Cloud, việc kết nối kho lưu trữ 
 >             --role="roles/developerconnect.readTokenAccessor" \
 >             --condition=None
 >         ```
+> 
+> *   **Trường hợp 3: Các Pod rơi vào trạng thái `ImagePullBackOff` hoặc `ErrImagePull` sau khi deploy lên cụm GKE**:
+>     *   **Nguyên nhân**: Cụm GKE Autopilot chạy trên các node sử dụng tài khoản Compute Engine mặc định (`...-compute@developer.gserviceaccount.com`). Nếu tài khoản này thiếu quyền đọc ảnh từ Artifact Registry, Kubernetes sẽ không thể kéo ảnh về để chạy Pod.
+>     *   **Cách khắc phục**: Mở Cloud Shell và chạy lệnh cấp quyền đọc (Registry Reader) sau:
+>         ```bash
+>         PROJECT_NUM=$(gcloud projects describe socialhub-micro-service-1 --format="value(projectNumber)")
+>         gcloud projects add-iam-policy-binding socialhub-micro-service-1 \
+>             --member="serviceAccount:${PROJECT_NUM}-compute@developer.gserviceaccount.com" \
+>             --role="roles/artifactregistry.reader" \
+>             --condition=None
+>         ```
+>     *   **Cách chẩn đoán lỗi khác**: Nếu đã chạy lệnh trên mà vẫn lỗi, chạy lệnh sau để xem lỗi chi tiết (ví dụ: sai tag hoặc sai tên ảnh):
+>         ```bash
+>         kubectl describe pod <tên-pod-bị-lỗi> -n default
+>         ```
 
 ### 3. Lệnh chạy thử nghiệm thủ công (Manual Trigger)
 Nếu bạn muốn kích hoạt build và deploy ngay lập tức từ máy tính cá nhân (hoặc Cloud Shell) bằng file cấu hình tối ưu cấu hình cao mà không cần push code lên GitHub:
@@ -277,3 +292,66 @@ gcloud iam workload-identity-pools delete socialhub-wif-pool \
 # 3. Xóa Service Account của GitHub
 gcloud iam service-accounts delete socialhub-github-sa@socialhub-micro-service-1.iam.gserviceaccount.com --quiet
 ```
+
+---
+
+## 🔍 CẨM NANG VẬN HÀNH, GIÁM SÁT VÀ DEBUG TRÊN KUBERNETES (GKE)
+
+Dưới đây là các câu lệnh `kubectl` thiết yếu giúp bạn vận hành, kiểm tra trạng thái và xử lý lỗi hệ thống trực tiếp trên Cloud Shell:
+
+### 1. Kiểm tra trạng thái tài nguyên
+```bash
+# Xem toàn bộ các Pod đang chạy, đang kéo ảnh hoặc bị lỗi
+kubectl get pods -n default
+
+# Xem trạng thái các dịch vụ (Services) và lấy IP Public để truy cập API Gateway bên ngoài
+kubectl get services -n default
+
+# Kiểm tra IP Public tĩnh được cấp phát cho API Gateway (chờ vài phút để hiện IP)
+kubectl get service gateway -n default
+```
+
+### 2. Đọc nhật ký hoạt động (Logs) của các Microservices
+```bash
+# Đọc 100 dòng log gần nhất của một dịch vụ cụ thể
+kubectl logs deployment/user-service -n default --tail=100
+
+# Theo dõi log thời gian thực (Real-time logs) của API Gateway
+kubectl logs deployment/gateway -n default -f
+
+# Xem log kết nối của hàng đợi RabbitMQ
+kubectl logs deployment/rabbitmq -n default --tail=50
+
+# Xem log hoạt động của Redis
+kubectl logs deployment/redis -n default --tail=50
+```
+
+### 3. Chẩn đoán và Debug lỗi (Khi Pod bị Crash hoặc ImagePullBackOff)
+```bash
+# Xem thông tin cấu hình chi tiết, sự kiện (Events) lỗi của một Pod cụ thể
+kubectl describe pod <tên-pod-bị-lỗi> -n default
+# (Ví dụ: kubectl describe pod gateway-7f6978784f-8ndw8 -n default)
+
+# Xem các sự kiện lỗi tổng quát của cả cụm GKE sắp xếp theo thời gian mới nhất
+kubectl get events -n default --sort-by='.metadata.creationTimestamp'
+```
+
+### 4. Cách ép cụm tải lại ảnh Docker mới ngay lập tức
+Khi bạn vừa sửa lỗi phân quyền hoặc cập nhật Docker Registry và không muốn chờ Kubernetes thử lại (backoff):
+```bash
+# Xóa toàn bộ Pod cũ. Kubernetes sẽ lập tức tạo Pod mới và kéo ảnh mới về tức thì
+kubectl delete pods --all -n default
+```
+
+### 5. Tiết kiệm chi phí: Tạm dừng và Bật lại dự án (Scale-to-Zero)
+Khi kết thúc ngày làm việc hoặc khi không kiểm thử, hãy hạ số lượng bản sao (replicas) về 0 để GKE Autopilot giải phóng toàn bộ máy ảo và **không tính tiền phần cứng (0 USD)**:
+
+*   **Tắt toàn bộ hệ thống (Hạ về 0)**:
+    ```bash
+    kubectl scale deployment --all --replicas=0 -n default
+    ```
+*   **Bật lại hệ thống khi tiếp tục code (Nâng lên 1)**:
+    ```bash
+    kubectl scale deployment gateway user-service friend-service post-service media-service notification-service chat-service rabbitmq redis --replicas=1 -n default
+    ```
+
