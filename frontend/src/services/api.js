@@ -21,6 +21,12 @@ api.interceptors.request.use(
         // Luôn đảm bảo header bypass ngrok warning tồn tại trong MỌI request
         // (kể cả multipart/form-data vì headers object có thể bị override)
         config.headers["ngrok-skip-browser-warning"] = "any-value";
+
+        // Nếu gửi FormData (upload file), ta cần xóa Content-Type mặc định (application/json)
+        // để trình duyệt tự động thiết lập Content-Type kèm boundary chính xác.
+        if (config.data instanceof FormData) {
+            delete config.headers["Content-Type"];
+        }
         return config;
     },
     (error) => Promise.reject(error)
