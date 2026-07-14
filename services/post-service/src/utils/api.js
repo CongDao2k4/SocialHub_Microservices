@@ -28,7 +28,7 @@ export const getUserProfile = async (userId, token) => {
       }
     });
 
-    const userProfile = response.data.data;
+    const userProfile = response.data.user;
 
     // 3. Save to cache with TTL = 30 minutes
     if (userProfile) {

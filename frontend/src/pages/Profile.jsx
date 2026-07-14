@@ -44,8 +44,7 @@ const EditProfileModal = ({ profileUser, onClose, onProfileUpdated }) => {
                 });
                 
                 if (uploadRes.data && uploadRes.data.id) {
-                    const apiBase = api.defaults.baseURL || "http://localhost:8080/api";
-                    uploadedAvatarUrl = `${apiBase}/media/file/${uploadRes.data.id}`;
+                    uploadedAvatarUrl = `/media/file/${uploadRes.data.id}`;
                 }
                 setIsUploading(false);
             }

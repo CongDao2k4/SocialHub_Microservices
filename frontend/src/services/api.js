@@ -24,9 +24,49 @@ api.interceptors.request.use(
     (error) => Promise.reject(error)
 );
 
-// 2. Response Interceptor: Tự động làm mới Token khi nhận lỗi 401
+const resolveUrls = (obj) => {
+    if (!obj || typeof obj !== "object") return obj;
+    
+    if (Array.isArray(obj)) {
+        for (let i = 0; i < obj.length; i++) {
+            resolveUrls(obj[i]);
+        }
+        return obj;
+    }
+
+    for (const key in obj) {
+        if (Object.prototype.hasOwnProperty.call(obj, key)) {
+            const val = obj[key];
+            if (typeof val === "string") {
+                const lowerKey = key.toLowerCase();
+                if ((lowerKey === "avatarurl" || lowerKey === "avatar_url") && val) {
+                    if (!val.startsWith("http")) {
+                        const cleanVal = val.startsWith("/") ? val : `/${val}`;
+                        obj[key] = `${api.defaults.baseURL}${cleanVal}`;
+                    } else if (val.includes("localhost:") && !window.location.hostname.includes("localhost")) {
+                        // Nếu đang chạy trên production (Vercel) nhưng avatarUrl chứa localhost, chuyển đổi về gateway đúng
+                        if (val.includes("/media/file/")) {
+                            const mediaId = val.split("/media/file/").pop();
+                            obj[key] = `${api.defaults.baseURL}/media/file/${mediaId}`;
+                        }
+                    }
+                }
+            } else if (typeof val === "object" && val !== null) {
+                resolveUrls(val);
+            }
+        }
+    }
+    return obj;
+};
+
+// 2. Response Interceptor: Tự động giải quyết URL ảnh đại diện và làm mới Token khi nhận lỗi 401
 api.interceptors.response.use(
-    (response) => response,
+    (response) => {
+        if (response.data) {
+            resolveUrls(response.data);
+        }
+        return response;
+    },
     async (error) => {
         const originalRequest = error.config;
 
