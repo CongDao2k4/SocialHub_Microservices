@@ -45,21 +45,35 @@ export const SocketProvider = ({ children }) => {
         // Tải số lượng chưa đọc
         fetchUnreadCount();
 
-        const token = localStorage.getItem("accessToken");
-
         // Xác định socketBaseURL động dựa trên api.defaults.baseURL (bỏ đuôi /api nếu có)
         const apiBase = api.defaults.baseURL || "http://localhost:8080/api";
         const socketBaseURL = apiBase.endsWith("/api") ? apiBase.slice(0, -4) : apiBase;
 
         // 2. Khởi tạo Notification Socket (qua đường dẫn /notification/socket.io/)
         const notifSock = io(socketBaseURL, {
-            auth: { token },
+            auth: (cb) => {
+                cb({ token: localStorage.getItem("accessToken") });
+            },
             path: "/notification/socket.io/",
             transports: ["websocket"]
         });
 
         notifSock.on("connect", () => {
             console.log("⚡ Kết nối thành công tới Notification Socket!");
+        });
+
+        notifSock.on("connect_error", async (err) => {
+            console.warn("⚠️ Lỗi kết nối Notification Socket:", err.message);
+            if (err.message.includes("expired") || err.message.includes("Authentication error") || err.message.includes("Token missing")) {
+                try {
+                    // Gọi một API đơn giản để kích hoạt bộ lọc làm mới token của Axios
+                    await api.get("/notifications/unread-count");
+                    console.log("🔄 Đã làm mới token thành công, thử kết nối lại Notification Socket...");
+                    notifSock.connect();
+                } catch (refreshErr) {
+                    console.error("❌ Không thể tự động làm mới token cho socket:", refreshErr.message);
+                }
+            }
         });
 
         notifSock.on("notification:count", (data) => {
@@ -95,13 +109,29 @@ export const SocketProvider = ({ children }) => {
 
         // 3. Khởi tạo Chat Socket (qua đường dẫn /chat/socket.io/)
         const chSock = io(socketBaseURL, {
-            auth: { token },
+            auth: (cb) => {
+                cb({ token: localStorage.getItem("accessToken") });
+            },
             path: "/chat/socket.io/",
             transports: ["websocket"]
         });
 
         chSock.on("connect", () => {
             console.log("⚡ Kết nối thành công tới Chat Socket!");
+        });
+
+        chSock.on("connect_error", async (err) => {
+            console.warn("⚠️ Lỗi kết nối Chat Socket:", err.message);
+            if (err.message.includes("expired") || err.message.includes("Authentication error") || err.message.includes("Token missing")) {
+                try {
+                    // Gọi một API đơn giản để kích hoạt bộ lọc làm mới token của Axios
+                    await api.get("/notifications/unread-count");
+                    console.log("🔄 Đã làm mới token thành công, thử kết nối lại Chat Socket...");
+                    chSock.connect();
+                } catch (refreshErr) {
+                    console.error("❌ Không thể tự động làm mới token cho socket:", refreshErr.message);
+                }
+            }
         });
 
         // Lắng nghe trạng thái trực tuyến của người dùng khác
