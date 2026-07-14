@@ -207,7 +207,12 @@ gcloud storage buckets create gs://socialhub-media-bucket-1 \
     *   **Bước 1**: Di chuyển `MONGO_URI` sang file Secret. Hãy chạy lệnh sau trên máy của bạn (hoặc Cloud Shell) để chuyển chuỗi kết nối thành dạng Base64:
         ```bash
         echo -n "mongodb+srv://socialhub:your_password@socialhub.xxxx.mongodb.net/?appName=SocialHub" | base64
+        
+        # Ví dụ:
+
+        echo -n "mongodb+srv://socialhub:MAT_KHAU_MONGODB_THAT@socialhub.qfpvssq.mongodb.net/?appName=SocialHub" | base64
         ```
+
     *   **Bước 2**: Mở file `k8s/secrets.yaml` và thay thế giá trị Base64 vừa tạo vào khóa `MONGO_URI`:
         ```yaml
         MONGO_URI: <DÁN_CHUỖI_BASE64_VÀO_ĐÂY>
