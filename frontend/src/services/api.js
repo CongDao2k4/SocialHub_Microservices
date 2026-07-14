@@ -40,16 +40,24 @@ const resolveUrls = (obj) => {
             if (typeof val === "string") {
                 const lowerKey = key.toLowerCase();
                 if ((lowerKey === "avatarurl" || lowerKey === "avatar_url") && val) {
+                    let resolvedUrl = val;
                     if (!val.startsWith("http")) {
                         const cleanVal = val.startsWith("/") ? val : `/${val}`;
-                        obj[key] = `${api.defaults.baseURL}${cleanVal}`;
+                        resolvedUrl = `${api.defaults.baseURL}${cleanVal}`;
                     } else if (val.includes("localhost:") && !window.location.hostname.includes("localhost")) {
                         // Nếu đang chạy trên production (Vercel) nhưng avatarUrl chứa localhost, chuyển đổi về gateway đúng
                         if (val.includes("/media/file/")) {
                             const mediaId = val.split("/media/file/").pop();
-                            obj[key] = `${api.defaults.baseURL}/media/file/${mediaId}`;
+                            resolvedUrl = `${api.defaults.baseURL}/media/file/${mediaId}`;
                         }
                     }
+
+                    // Nếu URL phân giải sử dụng ngrok, đính kèm query parameter để bỏ qua trang cảnh báo của ngrok
+                    if (resolvedUrl && resolvedUrl.includes("ngrok")) {
+                        resolvedUrl += resolvedUrl.includes("?") ? "&ngrok-skip-browser-warning=true" : "?ngrok-skip-browser-warning=true";
+                    }
+
+                    obj[key] = resolvedUrl;
                 }
             } else if (typeof val === "object" && val !== null) {
                 resolveUrls(val);
