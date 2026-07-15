@@ -37,7 +37,13 @@ app.use((req, res, next) => {
   next();
 });
 
-app.use(morgan('dev'));
+if (process.env.ENVIRONMENT !== 'production') {
+  app.use(morgan('dev'));
+} else {
+  app.use(morgan('combined', {
+    skip: (req, res) => res.statusCode < 400
+  }));
+}
 
 app.get('/health', (req, res) => {
   res.status(200).json({

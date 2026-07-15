@@ -21,7 +21,13 @@ const corsOptions = {
   credentials: true
 };
 app.use(cors(corsOptions));
-app.use(morgan('dev'));
+if (process.env.ENVIRONMENT !== 'production') {
+  app.use(morgan('dev'));
+} else {
+  app.use(morgan('combined', {
+    skip: (req, res) => res.statusCode < 400
+  }));
+}
 app.use(express.json());
 
 // Global Cache-Control disabling middleware for metadata endpoints (exempting public binary stream)

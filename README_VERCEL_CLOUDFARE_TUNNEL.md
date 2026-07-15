@@ -1,38 +1,12 @@
 # Hướng Dẫn Chạy Local & Deploy Frontend Lên Vercel Qua Cloudflare Tunnel
 
 Tài liệu này hướng dẫn chi tiết dành cho người mới bắt đầu để:
-1. Chạy mã nguồn giao diện (Frontend React + Vite) dưới máy cục bộ (không dùng Docker).
-2. Cấu hình và deploy giao diện này lên dịch vụ hosting đám mây **Vercel** miễn phí.
-3. Sử dụng **Cloudflare Tunnel** (`cloudflared`) để kết nối frontend trên Vercel tới backend chạy dưới local thay thế cho Ngrok.
+1. Cấu hình và deploy giao diện này lên dịch vụ hosting đám mây **Vercel** miễn phí.
+2. Sử dụng **Cloudflare Tunnel** (`cloudflared`) để kết nối frontend trên Vercel tới backend chạy dưới local thay thế cho Ngrok.
 
 ---
 
-## 💻 1. Hướng Dẫn Chạy Frontend Cục Bộ (Local)
-
-Để chạy giao diện cục bộ trên máy tính của bạn, hãy làm theo các bước sau:
-
-### Yêu cầu chuẩn bị
-- Đã cài đặt **Node.js** (Khuyến nghị phiên bản 18 hoặc 20 trở lên).
-
-### Các bước thực hiện:
-1. Mở cửa sổ dòng lệnh (Terminal/Command Prompt) tại thư mục root của dự án.
-2. Di chuyển vào thư mục giao diện `frontend`:
-   ```bash
-   cd frontend
-   ```
-3. Cài đặt các thư viện phụ thuộc (node_modules):
-   ```bash
-   npm install
-   ```
-4. Khởi chạy máy chủ giao diện ở chế độ nhà phát triển (Development mode):
-   ```bash
-   npm run dev
-   ```
-5. Mở trình duyệt web và truy cập địa chỉ được hiển thị ở terminal (thông thường là `http://localhost:5173`).
-
----
-
-## 🚀 2. Hướng Dẫn Deploy Lên Vercel (Cho Người Mới Bắt Đầu)
+## 🚀 1. Hướng Dẫn Deploy Lên Vercel (Cho Người Mới Bắt Đầu)
 
 Vì dự án SocialHub được tổ chức theo dạng Monorepo (chứa cả backend và frontend ở các thư mục con), ta cần cấu hình để Vercel hiểu và chỉ build riêng thư mục `frontend`.
 
@@ -94,7 +68,7 @@ Nếu bạn không muốn đẩy mã nguồn lên GitHub mà muốn deploy trự
 
 ---
 
-## 🌐 3. Kết Nối Frontend Trên Vercel Với Backend Chạy Cục Bộ (Sử Dụng Cloudflare Tunnel)
+## 🌐 2. Kết Nối Frontend Trên Vercel Với Backend Chạy Cục Bộ (Sử Dụng Cloudflare Tunnel)
 
 Khi deploy giao diện lên Vercel, ứng dụng sẽ chạy trên cloud công cộng. Tuy nhiên, API Gateway của bạn lại đang chạy trên cổng `localhost:8080` dưới máy cục bộ. 
 

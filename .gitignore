@@ -114,3 +114,5 @@ test-results/
 # Kubernetes Secrets (Bảo mật thông tin nhạy cảm)
 # ==============================
 k8s/secrets.yaml
+
+cloudfare/

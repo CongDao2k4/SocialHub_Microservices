@@ -1,6 +1,10 @@
 import { PrismaClient } from '@prisma/client';
 
-const prisma = new PrismaClient();
+const prisma = new PrismaClient(
+  process.env.ENVIRONMENT === 'production'
+    ? { log: ['error'] }
+    : { log: ['info', 'warn', 'error'] }
+);
 
 export const initDatabase = async () => {
     try {

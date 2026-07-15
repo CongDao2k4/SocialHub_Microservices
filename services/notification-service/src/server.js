@@ -1,3 +1,9 @@
+if (process.env.ENVIRONMENT === 'production') {
+  console.log = () => {};
+  console.info = () => {};
+  console.debug = () => {};
+}
+
 import http from 'http';
 import mongoose from 'mongoose';
 import amqp from 'amqplib';

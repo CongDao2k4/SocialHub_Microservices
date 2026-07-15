@@ -1,3 +1,9 @@
+if (process.env.ENVIRONMENT === 'production') {
+  console.log = () => {};
+  console.info = () => {};
+  console.debug = () => {};
+}
+
 import express from "express";
 import dotenv from "dotenv";
 

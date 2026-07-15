@@ -19,7 +19,7 @@ import {
 } from "lucide-react";
 
 // Component con tải Ảnh & Video an toàn bằng blob đính kèm JWT Token (Không có viền lót tím)
-const ChatMedia = ({ mediaId }) => {
+const ChatMedia = ({ mediaId, onLoad }) => {
     const [mediaData, setMediaData] = useState(null);
     const [isLoading, setIsLoading] = useState(true);
 
@@ -53,6 +53,13 @@ const ChatMedia = ({ mediaId }) => {
         };
     }, [mediaId]);
 
+    // Khi loading xong, gọi callback onLoad để thông báo cho component cha cuộn xuống
+    useEffect(() => {
+        if (!isLoading && onLoad) {
+            setTimeout(onLoad, 50);
+        }
+    }, [isLoading, onLoad]);
+
     if (isLoading) {
         return (
             <div className="flex items-center justify-center p-4 bg-slate-100 rounded-xl min-w-[120px]">
@@ -71,6 +78,7 @@ const ChatMedia = ({ mediaId }) => {
                 src={mediaData.url}
                 controls
                 className="rounded-xl max-h-72 max-w-full object-cover shadow-sm bg-black"
+                onLoadedData={onLoad}
             />
         );
     }
@@ -81,6 +89,7 @@ const ChatMedia = ({ mediaId }) => {
             alt="Attached"
             className="rounded-xl max-h-72 max-w-full object-contain cursor-pointer hover:opacity-95 transition shadow-sm"
             onClick={() => window.open(mediaData.url, "_blank")}
+            onLoad={onLoad}
         />
     );
 };
@@ -325,14 +334,20 @@ const Messages = () => {
     const messagesEndRef = useRef(null);
     const fileInputRef = useRef(null);
 
+    // Thêm các state phân trang tin nhắn và container ref
+    const [hasMore, setHasMore] = useState(false);
+    const [nextCursor, setNextCursor] = useState(null);
+    const [isLoadingMore, setIsLoadingMore] = useState(false);
+    const chatContainerRef = useRef(null);
+
     // Scroll to bottom
-    useEffect(() => {
-        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-    }, [messages]);
+    const scrollToBottom = (behavior = "smooth") => {
+        messagesEndRef.current?.scrollIntoView({ behavior });
+    };
 
     // 1. Tải danh sách cuộc hội thoại của User
-    const fetchConversations = async () => {
-        setIsLoadingConvs(true);
+    const fetchConversations = async (showLoading = true) => {
+        if (showLoading) setIsLoadingConvs(true);
         try {
             const res = await api.get("/conversations");
             if (res.data && res.data.success) {
@@ -341,7 +356,7 @@ const Messages = () => {
         } catch (err) {
             console.error("❌ Lỗi lấy danh sách hội thoại:", err.message);
         } finally {
-            setIsLoadingConvs(false);
+            if (showLoading) setIsLoadingConvs(false);
         }
     };
 
@@ -349,13 +364,11 @@ const Messages = () => {
         fetchConversations();
     }, []);
 
-    // 2. Join v\u00e0 t\u1ef1 \u0111\u1ed9ng Re-join room Websocket khi socket m\u1ea5t k\u1ebft n\u1ed1i r\u1ed3i t\u1ef1 k\u1ebft n\u1ed1i l\u1ea1i (reconnect)
-    // + L\u1eafng nghe s\u1ef1 ki\u1ec7n nh\u1eafn tin Realtime qua Socket.IO Chat Namespace
     useEffect(() => {
         if (!chatSocket || !selectedConv) return;
         const cId = selectedConv._id || selectedConv.id;
 
-        // Join room khi m\u1edf h\u1ed9i tho\u1ea1i v\u00e0 t\u1ef1 \u0111\u1ed9ng re-join khi socket reconnect
+        // Join room khi mở hội thoại và tự động re-join khi socket reconnect
         const joinRoom = () => {
             chatSocket.emit("conversation:join", { conversationId: cId });
             console.log(`📡 Đã kết nối & gửi yêu cầu join conversation room: ${cId}`);
@@ -364,18 +377,33 @@ const Messages = () => {
         joinRoom();
         chatSocket.on("connect", joinRoom);
 
-        // L\u1eafng nghe tin nh\u1eafn m\u1edbi \u0111\u00fang c\u00e1ch: \u0111\u0103ng k\u00fd listener \u1edf c\u1ea5p useEffect, kh\u00f4ng ph\u1ea3i trong callback
+        // Lắng nghe tin nhắn mới đúng cách: đăng ký listener ở cấp useEffect, không phải trong callback
         const handleNewMessage = (msg) => {
             if (String(msg.conversationId) === String(cId)) {
                 setMessages((prev) => [...prev, msg]);
-                // \u0110\u00e1nh d\u1ea5u \u0111\u00e3 \u0111\u1ecdc g\u1eedi ng\u01b0\u1ee3c l\u1ea1i
                 chatSocket.emit("message:read", { conversationId: cId, messageId: msg.id || msg._id });
+                setTimeout(() => {
+                    scrollToBottom("smooth");
+                }, 50);
             }
-            // C\u1eadp nh\u1eadt l\u1ea1i conversation list (unread count, last message)
-            fetchConversations();
+            // Cập nhật lại conversation list (unread count, last message) ngầm, không làm nhấp nháy bar Hội thoại
+            fetchConversations(false);
+        };
+
+        const handleReadAck = (ack) => {
+            if (String(ack.conversationId) === String(cId)) {
+                setConversations(prev => prev.map(c => {
+                    const id = c._id || c.id;
+                    if (String(id) === String(cId)) {
+                        return { ...c, unreadCount: 0 };
+                    }
+                    return c;
+                }));
+            }
         };
 
         chatSocket.on("message:received", handleNewMessage);
+        chatSocket.on("message:read:ack", handleReadAck);
 
         return () => {
             chatSocket.off("connect", joinRoom);
@@ -385,7 +413,7 @@ const Messages = () => {
 
 
 
-    // 3. Khi chọn 1 cuộc hội thoại -> Tải danh sách tin nhắn lịch sử
+    // 3. Khi chọn 1 cuộc hội thoại -> Tải danh sách tin nhắn lịch sử (Ban đầu lấy 10 tin nhắn gần nhất)
     useEffect(() => {
         if (!selectedConv) return;
         const cId = selectedConv._id || selectedConv.id;
@@ -393,9 +421,26 @@ const Messages = () => {
         const fetchMessages = async () => {
             setIsLoadingMsgs(true);
             try {
-                const res = await api.get(`/conversations/${cId}/messages`);
+                const res = await api.get(`/conversations/${cId}/messages?limit=10`);
                 if (res.data && res.data.success) {
-                    setMessages(res.data.data?.data ? [...res.data.data.data].reverse() : []);
+                    const fetchedMsgs = res.data.data?.data ? [...res.data.data.data].reverse() : [];
+                    setMessages(fetchedMsgs);
+                    setHasMore(res.data.data?.hasMore || false);
+                    setNextCursor(res.data.data?.nextCursor || null);
+
+                    // Đánh dấu đã đọc tất cả tin nhắn cũ
+                    if (fetchedMsgs.length > 0 && chatSocket) {
+                        const lastMsg = fetchedMsgs[fetchedMsgs.length - 1];
+                        chatSocket.emit("message:read", {
+                            conversationId: cId,
+                            messageId: lastMsg.id || lastMsg._id
+                        });
+                    }
+
+                    // Cuộn xuống dưới cùng sau khi tải xong
+                    setTimeout(() => {
+                        scrollToBottom("auto");
+                    }, 50);
                 }
             } catch (err) {
                 console.error("❌ Lỗi tải lịch sử tin nhắn:", err.message);
@@ -405,7 +450,48 @@ const Messages = () => {
         };
 
         fetchMessages();
-    }, [selectedConv]);
+    }, [selectedConv, chatSocket]);
+
+    const loadMoreMessages = async () => {
+        if (!selectedConv || !nextCursor || isLoadingMore) return;
+        const cId = selectedConv._id || selectedConv.id;
+        setIsLoadingMore(true);
+
+        const container = chatContainerRef.current;
+        const prevScrollHeight = container ? container.scrollHeight : 0;
+        const prevScrollTop = container ? container.scrollTop : 0;
+
+        try {
+            const res = await api.get(`/conversations/${cId}/messages?before=${nextCursor}&limit=10`);
+            if (res.data && res.data.success) {
+                const oldMsgs = res.data.data?.data ? [...res.data.data.data].reverse() : [];
+                setMessages(prev => [...oldMsgs, ...prev]);
+                setHasMore(res.data.data?.hasMore || false);
+                setNextCursor(res.data.data?.nextCursor || null);
+
+                // Giữ vị trí cuộn không đổi
+                if (container) {
+                    setTimeout(() => {
+                        const newScrollHeight = container.scrollHeight;
+                        container.scrollTop = prevScrollTop + (newScrollHeight - prevScrollHeight);
+                    }, 10);
+                }
+            }
+        } catch (err) {
+            console.error("❌ Lỗi tải thêm tin nhắn:", err.message);
+        } finally {
+            setIsLoadingMore(false);
+        }
+    };
+
+    const handleScroll = () => {
+        if (!chatContainerRef.current) return;
+        const { scrollTop } = chatContainerRef.current;
+        // Nếu cuộn lên gần trên cùng
+        if (scrollTop <= 5 && hasMore && !isLoadingMore && !isLoadingMsgs) {
+            loadMoreMessages();
+        }
+    };
 
     // Xử lý chọn nhiều File (Ảnh & Video)
     const handleFilesChange = (e) => {
@@ -505,6 +591,9 @@ const Messages = () => {
             setInputText("");
             selectedFiles.forEach((f) => URL.revokeObjectURL(f.previewUrl));
             setSelectedFiles([]);
+            setTimeout(() => {
+                scrollToBottom("smooth");
+            }, 50);
         } catch (err) {
             console.error("❌ Lỗi gửi tin nhắn:", err.message);
             alert("Không thể gửi tin nhắn. Vui lòng thử lại!");
@@ -731,7 +820,17 @@ const Messages = () => {
                         })()}
 
                         {/* Vùng nội dung danh sách tin nhắn */}
-                        <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50/50">
+                        <div
+                            ref={chatContainerRef}
+                            onScroll={handleScroll}
+                            className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50/50"
+                        >
+                            {isLoadingMore && (
+                                <div className="flex justify-center items-center py-2 shrink-0">
+                                    <Loader className="w-5 h-5 text-violet-500 animate-spin" />
+                                </div>
+                            )}
+
                             {isLoadingMsgs ? (
                                 <div className="flex justify-center items-center h-full">
                                     <Loader className="w-7 h-7 text-violet-500 animate-spin" />
@@ -770,7 +869,7 @@ const Messages = () => {
                                                 {msg.type === "image" && msg.mediaId ? (
                                                     <div className="flex flex-col space-y-1 items-end">
                                                         <div className="overflow-hidden rounded-2xl border border-slate-200/80 shadow-sm bg-black/5">
-                                                            <ChatMedia mediaId={msg.mediaId} />
+                                                            <ChatMedia mediaId={msg.mediaId} onLoad={() => scrollToBottom("smooth")} />
                                                         </div>
                                                         {msg.content && msg.content !== "Sent an image" && (
                                                             <div className={`px-4 py-2.5 rounded-2xl text-xs leading-relaxed break-words shadow-sm ${isMe ? "bg-violet-600 text-white rounded-br-none" : "bg-white text-slate-800 rounded-bl-none border border-slate-200"
