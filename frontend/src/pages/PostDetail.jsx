@@ -54,7 +54,7 @@ const PostDetail = () => {
             <div className="flex items-center space-x-3">
                 <button
                     onClick={() => navigate(-1)}
-                    className="flex items-center space-x-2 text-slate-600 hover:text-violet-600 p-2 rounded-xl hover:bg-slate-200/50 transition cursor-pointer"
+                    className="flex items-center space-x-2 text-slate-600 hover:text-blue-600 p-2 rounded-xl hover:bg-slate-200/50 transition cursor-pointer"
                 >
                     <ArrowLeft className="w-5 h-5" />
                     <span className="font-medium text-sm">Quay lại</span>
@@ -65,7 +65,7 @@ const PostDetail = () => {
             {/* Content Body */}
             {isLoading ? (
                 <div className="flex justify-center py-16">
-                    <Loader className="w-8 h-8 text-violet-500 animate-spin" />
+                    <Loader className="w-8 h-8 text-blue-600 animate-spin" />
                 </div>
             ) : error ? (
                 <div className="text-center py-16 bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
@@ -73,7 +73,7 @@ const PostDetail = () => {
                     <p className="text-slate-700 text-lg font-semibold">{error}</p>
                     <Link
                         to="/"
-                        className="inline-block mt-4 text-sm font-medium text-violet-600 hover:underline"
+                        className="inline-block mt-4 text-sm font-medium text-blue-600 hover:underline"
                     >
                         Trở về trang chủ
                     </Link>

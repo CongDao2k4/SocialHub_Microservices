@@ -114,25 +114,25 @@ const ShareModal = ({ post, onClose, onShareSuccess }) => {
     });
 
     return (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[100] flex items-center justify-center p-4 animate-fadeIn">
-            <div className="bg-slate-900 border border-white/10 w-full max-w-lg p-6 rounded-2xl shadow-2xl space-y-4 relative">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4 animate-fadeIn">
+            <div className="bg-white border border-slate-200 w-full max-w-lg p-6 rounded-2xl shadow-2xl space-y-4 relative">
                 {/* Header modal */}
-                <div className="flex items-center justify-between border-b border-white/10 pb-3">
-                    <h3 className="text-sm font-bold text-white uppercase tracking-wider">Chia sẻ bài viết</h3>
-                    <button onClick={onClose} className="p-1 hover:bg-white/10 rounded-full text-slate-400 hover:text-white cursor-pointer transition">
+                <div className="flex items-center justify-between border-b border-slate-200 pb-3">
+                    <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">Chia sẻ bài viết</h3>
+                    <button onClick={onClose} className="p-1 hover:bg-slate-100 rounded-full text-slate-400 hover:text-slate-700 cursor-pointer transition">
                         <X className="w-4 h-4" />
                     </button>
                 </div>
 
                 {/* Thanh chọn Tab */}
-                <div className="flex bg-slate-950/60 p-1 rounded-xl border border-white/5">
+                <div className="flex bg-slate-100 p-1 rounded-xl border border-slate-200">
                     <button
                         type="button"
                         onClick={() => setActiveTab("feed")}
                         className={`flex-1 py-2 text-xs font-semibold rounded-lg transition cursor-pointer text-center ${
                             activeTab === "feed"
-                                ? "bg-violet-600 text-white shadow-lg font-bold"
-                                : "text-slate-400 hover:text-white"
+                                ? "bg-blue-600 text-white shadow-sm font-bold"
+                                : "text-slate-600 hover:text-slate-900"
                         }`}
                     >
                         Chia sẻ lên Bảng tin
@@ -142,8 +142,8 @@ const ShareModal = ({ post, onClose, onShareSuccess }) => {
                         onClick={() => setActiveTab("chat")}
                         className={`flex-1 py-2 text-xs font-semibold rounded-lg transition cursor-pointer text-center ${
                             activeTab === "chat"
-                                ? "bg-violet-600 text-white shadow-lg font-bold"
-                                : "text-slate-400 hover:text-white"
+                                ? "bg-blue-600 text-white shadow-sm font-bold"
+                                : "text-slate-600 hover:text-slate-900"
                         }`}
                     >
                         Gửi qua Tin nhắn
@@ -152,7 +152,7 @@ const ShareModal = ({ post, onClose, onShareSuccess }) => {
 
                 {/* Phần viết lời dẫn chung */}
                 <div>
-                    <label className="block text-slate-400 text-[10px] uppercase font-bold tracking-wider mb-2">
+                    <label className="block text-slate-500 text-[10px] uppercase font-bold tracking-wider mb-2">
                         Lời dẫn đi kèm (Không bắt buộc)
                     </label>
                     <textarea
@@ -160,7 +160,7 @@ const ShareModal = ({ post, onClose, onShareSuccess }) => {
                         onChange={(e) => setShareText(e.target.value)}
                         placeholder="Nói gì đó về bài viết này..."
                         rows="2"
-                        className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-white text-xs placeholder-slate-500 focus:outline-none focus:border-violet-500 transition resize-none"
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-slate-800 text-xs placeholder-slate-400 focus:outline-none focus:border-blue-600 transition resize-none"
                     />
                 </div>
 
@@ -168,31 +168,31 @@ const ShareModal = ({ post, onClose, onShareSuccess }) => {
                 {activeTab === "feed" && (
                     <form onSubmit={handleShareToFeed} className="space-y-4">
                         {/* Preview Bài đăng gốc */}
-                        <div className="border border-white/10 rounded-xl p-4 bg-slate-950/40 text-xs space-y-2 pointer-events-none">
+                        <div className="border border-slate-200 rounded-xl p-4 bg-slate-50/70 text-xs space-y-2 pointer-events-none">
                             <div className="flex items-center space-x-2">
                                 <img
                                     src={post.author?.avatarUrl || "https://api.dicebear.com/7.x/adventurer/svg?seed=Felix"}
-                                    className="w-6 h-6 rounded-full object-cover border border-white/10"
+                                    className="w-6 h-6 rounded-full object-cover border border-slate-200"
                                     alt="Author Avatar"
                                 />
-                                <span className="font-semibold text-white">{post.author?.displayName}</span>
+                                <span className="font-semibold text-slate-800">{post.author?.displayName}</span>
                             </div>
-                            <p className="text-slate-350 line-clamp-3 leading-relaxed whitespace-pre-wrap">{post.content}</p>
+                            <p className="text-slate-600 line-clamp-3 leading-relaxed whitespace-pre-wrap">{post.content}</p>
                         </div>
 
                         {/* Nút gửi */}
-                        <div className="flex items-center justify-end space-x-3 pt-2 border-t border-white/5">
+                        <div className="flex items-center justify-end space-x-3 pt-2 border-t border-slate-100">
                             <button
                                 type="button"
                                 onClick={onClose}
-                                className="px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-xs font-semibold text-slate-300 transition cursor-pointer"
+                                className="px-4 py-2 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl text-xs font-semibold text-slate-600 transition cursor-pointer"
                             >
                                 Hủy
                             </button>
                             <button
                                 type="submit"
                                 disabled={isSubmitting}
-                                className="flex items-center space-x-2 px-5 py-2 bg-gradient-to-r from-violet-500 to-pink-500 hover:opacity-90 disabled:opacity-50 text-white rounded-xl text-xs font-bold transition cursor-pointer shadow-lg shadow-violet-500/20"
+                                className="flex items-center space-x-2 px-5 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold transition cursor-pointer shadow-md shadow-blue-600/10"
                             >
                                 {isSubmitting ? (
                                     <Loader className="w-4 h-4 animate-spin" />
@@ -212,13 +212,13 @@ const ShareModal = ({ post, onClose, onShareSuccess }) => {
                     <div className="space-y-3.5">
                         {/* Thanh tìm kiếm hội thoại */}
                         <div className="relative">
-                            <Search className="w-4 h-4 text-slate-500 absolute left-3 top-2.5" />
+                            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
                             <input
                                 type="text"
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
                                 placeholder="Tìm kiếm cuộc trò chuyện..."
-                                className="w-full bg-white/5 border border-white/10 rounded-xl pl-9 pr-4 py-2 text-white text-xs placeholder-slate-500 focus:outline-none focus:border-violet-500 transition"
+                                className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-9 pr-4 py-2 text-slate-800 text-xs placeholder-slate-400 focus:outline-none focus:border-blue-600 transition"
                             />
                         </div>
 
@@ -226,7 +226,7 @@ const ShareModal = ({ post, onClose, onShareSuccess }) => {
                         <div className="max-h-56 overflow-y-auto space-y-2 pr-1">
                             {isLoadingConvs ? (
                                 <div className="flex justify-center items-center py-8">
-                                    <Loader className="w-6 h-6 text-violet-500 animate-spin" />
+                                    <Loader className="w-6 h-6 text-blue-600 animate-spin" />
                                 </div>
                             ) : filteredConvs.length > 0 ? (
                                 filteredConvs.map((conv) => {
@@ -235,14 +235,14 @@ const ShareModal = ({ post, onClose, onShareSuccess }) => {
                                     const isSent = sentConvs[cId] === true;
 
                                     return (
-                                        <div key={cId} className="flex items-center justify-between p-2 hover:bg-white/5 rounded-xl transition">
+                                        <div key={cId} className="flex items-center justify-between p-2 hover:bg-slate-50 rounded-xl transition border border-transparent hover:border-slate-100">
                                             <div className="flex items-center space-x-2.5 min-w-0">
                                                 <img
                                                     src={avatar}
-                                                    className="w-8 h-8 rounded-full object-cover border border-white/10 shrink-0"
+                                                    className="w-8 h-8 rounded-full object-cover border border-slate-200 shrink-0"
                                                     alt="Conv Avatar"
                                                 />
-                                                <span className="text-xs font-semibold text-slate-200 truncate">{title}</span>
+                                                <span className="text-xs font-semibold text-slate-800 truncate">{title}</span>
                                             </div>
                                             <button
                                                 type="button"
@@ -250,8 +250,8 @@ const ShareModal = ({ post, onClose, onShareSuccess }) => {
                                                 disabled={isSent}
                                                 className={`flex items-center space-x-1 px-3 py-1.5 rounded-lg text-[10px] font-bold transition cursor-pointer ${
                                                     isSent
-                                                        ? "bg-emerald-650/20 text-emerald-400 border border-emerald-500/30 cursor-default"
-                                                        : "bg-violet-600 hover:bg-violet-750 text-white shadow-md shadow-violet-600/10"
+                                                        ? "bg-emerald-50 text-emerald-600 border border-emerald-200 cursor-default"
+                                                        : "bg-blue-600 hover:bg-blue-700 text-white shadow-sm"
                                                 }`}
                                             >
                                                 {isSent ? (
@@ -270,16 +270,16 @@ const ShareModal = ({ post, onClose, onShareSuccess }) => {
                                     );
                                 })
                             ) : (
-                                <p className="text-[10px] text-slate-500 italic text-center py-6">Không tìm thấy cuộc trò chuyện nào.</p>
+                                <p className="text-[10px] text-slate-400 italic text-center py-6">Không tìm thấy cuộc trò chuyện nào.</p>
                             )}
                         </div>
 
                         {/* Nút đóng */}
-                        <div className="flex justify-end pt-2 border-t border-white/5">
+                        <div className="flex justify-end pt-2 border-t border-slate-100">
                             <button
                                 type="button"
                                 onClick={onClose}
-                                className="px-5 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-xs font-semibold text-slate-300 transition cursor-pointer"
+                                className="px-5 py-2 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl text-xs font-semibold text-slate-600 transition cursor-pointer"
                             >
                                 Đóng
                             </button>

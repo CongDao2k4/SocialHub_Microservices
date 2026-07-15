@@ -117,7 +117,7 @@ const Notifications = () => {
             case "post_liked":
                 return <Heart className="w-5 h-5 text-rose-500 fill-rose-500" />;
             case "post_commented":
-                return <MessageSquare className="w-5 h-5 text-violet-600 fill-violet-600/10" />;
+                return <MessageSquare className="w-5 h-5 text-blue-600 fill-blue-600/10" />;
             case "post_shared":
                 return <Share2 className="w-5 h-5 text-sky-500" />;
             case "friend_request":
@@ -134,7 +134,7 @@ const Notifications = () => {
             {/* Header thông báo */}
             <div className="flex items-center justify-between border-b border-slate-200 pb-4">
                 <div>
-                    <h1 className="text-3xl font-extrabold tracking-tight bg-gradient-to-r from-violet-600 to-pink-600 bg-clip-text text-transparent">Thông báo</h1>
+                    <h1 className="text-3xl font-extrabold tracking-tight text-slate-900">Thông báo</h1>
                     <p className="text-slate-600 text-sm mt-1">Nơi lưu lại các lượt tương tác của mọi người với bạn.</p>
                 </div>
                 
@@ -152,7 +152,7 @@ const Notifications = () => {
             {/* Danh sách thông báo */}
             {isLoading ? (
                 <div className="flex justify-center py-12">
-                    <Loader className="w-8 h-8 text-violet-500 animate-spin" />
+                    <Loader className="w-8 h-8 text-blue-600 animate-spin" />
                 </div>
             ) : notifications.length > 0 ? (
                 <div className="space-y-3">
@@ -163,7 +163,7 @@ const Notifications = () => {
                             className={`flex items-center justify-between p-4 rounded-2xl border transition duration-200 cursor-pointer ${
                                 notif.isRead
                                     ? "bg-white border-slate-200 hover:bg-slate-50 text-slate-700 shadow-sm"
-                                    : "bg-violet-50/50 border-violet-100 shadow-md shadow-violet-500/5 hover:bg-violet-100/30 text-slate-900"
+                                    : "bg-blue-50/50 border-blue-100 shadow-md shadow-blue-600/5 hover:bg-blue-100/30 text-slate-900"
                             }`}
                         >
                             <div className="flex items-center space-x-4">
@@ -187,7 +187,7 @@ const Notifications = () => {
 
                             {/* Dấu chấm xanh báo hiệu chưa đọc */}
                             {!notif.isRead && (
-                                <div className="w-2.5 h-2.5 bg-violet-600 rounded-full animate-pulse shadow-md shadow-violet-600/50 mr-2"></div>
+                                <div className="w-2.5 h-2.5 bg-blue-600 rounded-full animate-pulse shadow-md shadow-blue-600/50 mr-2"></div>
                             )}
                         </div>
                     ))}

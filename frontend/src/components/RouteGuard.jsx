@@ -8,7 +8,7 @@ export const ProtectedRoute = () => {
     if (loading) {
         return (
             <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center">
-                <div className="w-10 h-10 border-4 border-violet-500 border-t-transparent rounded-full animate-spin"></div>
+                <div className="w-10 h-10 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
                 <p className="text-slate-400 mt-4 text-sm">Đang tải phiên làm việc...</p>
             </div>
         );

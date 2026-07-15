@@ -10,7 +10,7 @@ import { useAuth } from "../context/AuthContext"; // <-- Import useAuth
 const PostCard = ({ post, currentUserId, onPostShared, onPostDeleted, onPostUpdated }) => {
     const { user: currentUser } = useAuth(); // Lấy thông tin user hiện tại
     const [showEditModal, setShowEditModal] = useState(false);
-    const [activeLightboxUrl, setActiveLightboxUrl] = useState(null);
+    const [lightboxData, setLightboxData] = useState(null); // { items: [...], index: 0 }
     const [isLiked, setIsLiked] = useState(post.isLikedByMe || false);
     const [likeCount, setLikeCount] = useState(post.like_count || 0);
     const [commentCount, setCommentCount] = useState(post.comment_count || 0);
@@ -18,15 +18,9 @@ const PostCard = ({ post, currentUserId, onPostShared, onPostDeleted, onPostUpda
     const [imageUrl, setImageUrl] = useState("");
     const [isLoadingImage, setIsLoadingImage] = useState(false);
 
-    // Handler tải bản original sắc nét cho Lightbox Modal
-    const handleOpenLightbox = async (mId) => {
-        try {
-            const res = await api.get(`/media/file/${mId}?variant=original`, { responseType: "blob" });
-            const objUrl = URL.createObjectURL(res.data);
-            setActiveLightboxUrl(objUrl);
-        } catch (err) {
-            console.error("❌ Lỗi tải ảnh chất lượng cao gốc:", err.message);
-        }
+    // Mở Lightbox Modal với danh sách toàn bộ ảnh của bài viết
+    const handleOpenLightbox = (index, itemsList = mediaItems) => {
+        setLightboxData({ items: itemsList, index });
     };
 
     // Trạng thái cho bài đăng được chia sẻ
@@ -377,7 +371,7 @@ const PostCard = ({ post, currentUserId, onPostShared, onPostDeleted, onPostUpda
                         />
                     </Link>
                     <div>
-                        <Link to={`/profile/${post.author_id}`} className="font-semibold text-slate-800 text-sm hover:text-violet-600 transition">
+                        <Link to={`/profile/${post.author_id}`} className="font-semibold text-slate-800 text-sm hover:text-blue-600 transition">
                             {post.author?.displayName || "Người dùng SocialHub"}
                         </Link>
                         <p className="text-xs text-slate-500 mt-0.5">{new Date(post.created_at || post.createdAt).toLocaleString()}</p>
@@ -413,7 +407,7 @@ const PostCard = ({ post, currentUserId, onPostShared, onPostDeleted, onPostUpda
                 <div className={`grid gap-2 rounded-2xl overflow-hidden border border-slate-200 mb-4 bg-slate-50 ${
                     mediaItems.length === 1 ? "grid-cols-1" : "grid-cols-2"
                 }`}>
-                    {mediaItems.map((item) => (
+                    {mediaItems.map((item, idx) => (
                         <div key={item.id} className="relative overflow-hidden flex items-center justify-center bg-black/5 rounded-xl">
                             {item.isVideo ? (
                                 <video src={item.url} controls className="w-full max-h-[450px] object-cover rounded-xl" />
@@ -422,7 +416,7 @@ const PostCard = ({ post, currentUserId, onPostShared, onPostDeleted, onPostUpda
                                     src={item.url}
                                     alt="Post Attachment"
                                     className="w-full max-h-[450px] object-cover hover:opacity-95 transition cursor-pointer"
-                                    onClick={() => handleOpenLightbox(item.id)}
+                                    onClick={() => handleOpenLightbox(idx, mediaItems)}
                                 />
                             )}
                         </div>
@@ -437,10 +431,10 @@ const PostCard = ({ post, currentUserId, onPostShared, onPostDeleted, onPostUpda
 
             {/* Nếu là bài chia sẻ, hiển thị bài gốc nhúng lồng bên trong (Nested Card) */}
             {post.is_shared && post.original_post_id && (
-                <div className="border border-slate-200 rounded-2xl p-4 bg-slate-50/50 mb-4 space-y-3 hover:border-violet-500/30 transition">
+                <div className="border border-slate-200 rounded-2xl p-4 bg-slate-50/50 mb-4 space-y-3 hover:border-blue-500/30 transition">
                     {isLoadingOriginal ? (
                         <div className="flex justify-center py-4">
-                            <Loader className="w-5 h-5 text-violet-500 animate-spin" />
+                            <Loader className="w-5 h-5 text-blue-600 animate-spin" />
                         </div>
                     ) : originalPost ? (
                         <>
@@ -454,7 +448,7 @@ const PostCard = ({ post, currentUserId, onPostShared, onPostDeleted, onPostUpda
                                     />
                                 </Link>
                                 <div>
-                                    <Link to={`/profile/${originalPost.author_id}`} className="font-semibold text-slate-800 text-xs hover:text-violet-600 transition">
+                                    <Link to={`/profile/${originalPost.author_id}`} className="font-semibold text-slate-800 text-xs hover:text-blue-600 transition">
                                         {originalPost.author?.displayName}
                                     </Link>
                                     <p className="text-[10px] text-slate-500 mt-0.5">{new Date(originalPost.created_at || originalPost.createdAt).toLocaleString()}</p>
@@ -467,7 +461,7 @@ const PostCard = ({ post, currentUserId, onPostShared, onPostDeleted, onPostUpda
                                 <div className={`grid gap-1.5 rounded-xl overflow-hidden border border-slate-200 mt-2 bg-slate-50 max-w-lg ${
                                     originalMediaItems.length === 1 ? "grid-cols-1" : "grid-cols-2"
                                 }`}>
-                                    {originalMediaItems.map((item) => (
+                                    {originalMediaItems.map((item, idx) => (
                                         <div key={item.id} className="relative overflow-hidden flex items-center justify-center bg-black/5 rounded-lg max-h-48">
                                             {item.isVideo ? (
                                                 <video src={item.url} controls className="w-full max-h-48 object-cover rounded-lg" />
@@ -476,7 +470,7 @@ const PostCard = ({ post, currentUserId, onPostShared, onPostDeleted, onPostUpda
                                                     src={item.url}
                                                     alt="Original Attachment"
                                                     className="w-full max-h-48 object-cover hover:opacity-95 transition cursor-pointer"
-                                                    onClick={() => window.open(item.url, "_blank")}
+                                                    onClick={() => handleOpenLightbox(idx, originalMediaItems)}
                                                 />
                                             )}
                                         </div>
@@ -509,7 +503,7 @@ const PostCard = ({ post, currentUserId, onPostShared, onPostDeleted, onPostUpda
                 {/* Nút Bình luận */}
                 <button
                     onClick={() => setShowComments(!showComments)}
-                    className={`flex items-center space-x-2 hover:text-violet-600 transition cursor-pointer ${showComments ? "text-violet-600 font-bold" : ""}`}
+                    className={`flex items-center space-x-2 hover:text-blue-600 transition cursor-pointer ${showComments ? "text-blue-600 font-bold" : ""}`}
                 >
                     <MessageSquare className="w-5 h-5" />
                     <span>{commentCount} Bình luận</span>
@@ -518,7 +512,7 @@ const PostCard = ({ post, currentUserId, onPostShared, onPostDeleted, onPostUpda
                 {/* Nút Chia sẻ */}
                 <button
                     onClick={() => setShowShareModal(true)}
-                    className="flex items-center space-x-2 hover:text-sky-600 transition cursor-pointer"
+                    className="flex items-center space-x-2 hover:text-blue-600 transition cursor-pointer"
                 >
                     <Share2 className="w-5 h-5" />
                     <span>{shareCount} Chia sẻ</span>
@@ -530,7 +524,7 @@ const PostCard = ({ post, currentUserId, onPostShared, onPostDeleted, onPostUpda
                 <div className="mt-4 pt-4 border-t border-slate-100 space-y-4 animate-fadeIn">
                     {/* Banner hiển thị đang phản hồi ai */}
                     {replyingTo && (
-                        <div className="flex items-center justify-between bg-violet-50 border border-violet-100 rounded-xl px-4 py-1.5 text-[10px] text-violet-700">
+                        <div className="flex items-center justify-between bg-blue-50 border border-blue-100 rounded-xl px-4 py-1.5 text-[10px] text-blue-700">
                             <span>Đang Phản hồi <strong>{replyingTo.author?.displayName}</strong></span>
                             <button
                                 type="button"
@@ -550,12 +544,12 @@ const PostCard = ({ post, currentUserId, onPostShared, onPostDeleted, onPostUpda
                             value={commentText}
                             onChange={(e) => setCommentText(e.target.value)}
                             placeholder={replyingTo ? `Phản hồi ${replyingTo.author?.displayName}...` : "Viết bình luận..."}
-                            className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-violet-600 transition"
+                            className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-blue-600 transition"
                         />
                         <button
                             type="submit"
                             disabled={isSubmittingComment || !commentText.trim()}
-                            className="p-2 bg-violet-600 disabled:opacity-50 hover:bg-violet-700 text-white rounded-xl cursor-pointer transition"
+                            className="p-2 bg-blue-600 disabled:opacity-50 hover:bg-blue-700 text-white rounded-xl cursor-pointer transition"
                         >
                             {isSubmittingComment ? (
                                 <Loader className="w-4 h-4 animate-spin" />
@@ -568,7 +562,7 @@ const PostCard = ({ post, currentUserId, onPostShared, onPostDeleted, onPostUpda
                     {/* Danh sách bình luận */}
                     {isLoadingComments ? (
                         <div className="flex justify-center py-4">
-                            <Loader className="w-6 h-6 text-violet-500 animate-spin" />
+                            <Loader className="w-6 h-6 text-blue-600 animate-spin" />
                         </div>
                     ) : comments.length > 0 ? (
                         <div className="space-y-3.5 max-h-60 overflow-y-auto pr-1">
@@ -599,7 +593,7 @@ const PostCard = ({ post, currentUserId, onPostShared, onPostDeleted, onPostUpda
                                                         <p className="text-slate-600 text-xs mt-1 leading-relaxed whitespace-pre-wrap">
                                                             {parentComment.parsedInfo?.mentionName ? (
                                                                 <span>
-                                                                    <span className="text-violet-600 font-semibold cursor-pointer hover:underline mr-1.5">
+                                                                    <span className="text-blue-600 font-semibold cursor-pointer hover:underline mr-1.5">
                                                                         @{parentComment.parsedInfo.mentionName}
                                                                     </span>
                                                                     {parentComment.parsedInfo.cleanText}
@@ -612,7 +606,7 @@ const PostCard = ({ post, currentUserId, onPostShared, onPostDeleted, onPostUpda
                                                         {/* Nút Phản hồi */}
                                                         <button
                                                             onClick={() => handleReplyClick(parentComment)}
-                                                            className="text-[10px] text-slate-500 hover:text-violet-600 font-semibold mt-1 transition cursor-pointer"
+                                                            className="text-[10px] text-slate-500 hover:text-blue-600 font-semibold mt-1 transition cursor-pointer"
                                                         >
                                                             Phản hồi
                                                         </button>
@@ -636,7 +630,7 @@ const PostCard = ({ post, currentUserId, onPostShared, onPostDeleted, onPostUpda
                                                 const isReplyAuthor = reply.author_id === currentUserId;
                                                 
                                                 return (
-                                                    <div key={rId} className="flex items-start justify-between bg-violet-50/40 rounded-2xl p-3 border border-violet-100/50 ml-8 group transition-all duration-200">
+                                                    <div key={rId} className="flex items-start justify-between bg-blue-50/40 rounded-2xl p-3 border border-blue-100/50 ml-8 group transition-all duration-200">
                                                         <div className="flex items-start space-x-3">
                                                             <img
                                                                 src={reply.author?.avatarUrl || "https://api.dicebear.com/7.x/adventurer/svg?seed=Felix"}
@@ -651,7 +645,7 @@ const PostCard = ({ post, currentUserId, onPostShared, onPostDeleted, onPostUpda
                                                                 <p className="text-slate-600 text-xs mt-1 leading-relaxed whitespace-pre-wrap">
                                                                     {reply.parsedInfo?.mentionName ? (
                                                                         <span>
-                                                                            <span className="text-violet-600 font-semibold cursor-pointer hover:underline mr-1.5">
+                                                                            <span className="text-blue-600 font-semibold cursor-pointer hover:underline mr-1.5">
                                                                                 @{reply.parsedInfo.mentionName}
                                                                             </span>
                                                                             {reply.parsedInfo.cleanText}
@@ -664,7 +658,7 @@ const PostCard = ({ post, currentUserId, onPostShared, onPostDeleted, onPostUpda
                                                                 {/* Nút Phản hồi (để phản hồi tiếp trên cùng nhánh cha) */}
                                                                 <button
                                                                     onClick={() => handleReplyClick(parentComment)}
-                                                                    className="text-[10px] text-slate-500 hover:text-violet-600 font-semibold mt-1 transition cursor-pointer"
+                                                                    className="text-[10px] text-slate-500 hover:text-blue-600 font-semibold mt-1 transition cursor-pointer"
                                                                 >
                                                                     Phản hồi
                                                                 </button>
@@ -714,13 +708,11 @@ const PostCard = ({ post, currentUserId, onPostShared, onPostDeleted, onPostUpda
             )}
 
             {/* POP-UP MODAL XEM ẢNH FULLSCREEN */}
-            {activeLightboxUrl && (
+            {lightboxData && (
                 <ImageLightboxModal
-                    imageUrl={activeLightboxUrl}
-                    onClose={() => {
-                        URL.revokeObjectURL(activeLightboxUrl);
-                        setActiveLightboxUrl(null);
-                    }}
+                    images={lightboxData.items}
+                    initialIndex={lightboxData.index}
+                    onClose={() => setLightboxData(null)}
                 />
             )}
         </div>

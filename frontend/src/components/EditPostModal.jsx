@@ -131,7 +131,7 @@ const EditPostModal = ({ post, imageUrl, onClose, onPostUpdated }) => {
                             onChange={(e) => setContent(e.target.value)}
                             placeholder="Bạn muốn sửa nội dung gì?"
                             rows={4}
-                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-violet-600 focus:ring-1 focus:ring-violet-600 transition resize-none"
+                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-600 transition resize-none"
                             required={hasRemovedExistingImage && !newImageFile}
                         />
                     </div>
@@ -183,7 +183,7 @@ const EditPostModal = ({ post, imageUrl, onClose, onPostUpdated }) => {
                                 <button
                                     type="button"
                                     onClick={() => fileInputRef.current.click()}
-                                    className="flex items-center justify-center w-full py-4 border-2 border-dashed border-slate-200 rounded-xl hover:border-violet-500 hover:bg-violet-50 text-slate-400 hover:text-violet-600 transition cursor-pointer"
+                                    className="flex items-center justify-center w-full py-4 border-2 border-dashed border-slate-200 rounded-xl hover:border-blue-600 hover:bg-blue-50 text-slate-400 hover:text-blue-600 transition cursor-pointer"
                                 >
                                     <Image className="w-6 h-6" />
                                 </button>
@@ -203,7 +203,7 @@ const EditPostModal = ({ post, imageUrl, onClose, onPostUpdated }) => {
                         <button
                             type="submit"
                             disabled={isSubmitting || (isUploading)}
-                            className="px-5 py-2 bg-gradient-to-r from-violet-600 to-pink-600 hover:from-violet-700 hover:to-pink-700 text-white rounded-xl transition cursor-pointer text-xs font-semibold shadow-md shadow-violet-500/10 flex items-center space-x-1.5 disabled:opacity-50"
+                            className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl transition cursor-pointer text-xs font-semibold shadow-md shadow-blue-600/10 flex items-center space-x-1.5 disabled:opacity-50"
                         >
                             {isSubmitting ? (
                                 <Loader className="w-4 h-4 animate-spin" />

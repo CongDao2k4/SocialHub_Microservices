@@ -170,13 +170,13 @@ const ChatWidget = () => {
             <aside className="w-64 bg-white border-l border-slate-200 p-5 fixed right-0 top-0 h-screen flex flex-col pt-20 shadow-sm">
                 <div className="flex items-center justify-between border-b border-slate-200 pb-3 mb-4">
                     <div className="flex items-center space-x-2">
-                        <Users className="w-5 h-5 text-violet-600" />
+                        <Users className="w-5 h-5 text-blue-600" />
                         <h3 className="font-bold text-slate-800 text-sm">Bạn bè ({friends.length})</h3>
                     </div>
                     <button
                         onClick={() => setShowCreateGroupModal(true)}
                         title="Tạo nhóm chat"
-                        className="p-1 hover:bg-slate-100 rounded-lg text-slate-500 hover:text-violet-600 transition cursor-pointer border border-slate-200"
+                        className="p-1 hover:bg-slate-100 rounded-lg text-slate-500 hover:text-blue-600 transition cursor-pointer border border-slate-200"
                     >
                         <MessageSquarePlus className="w-4 h-4" />
                     </button>
@@ -184,7 +184,7 @@ const ChatWidget = () => {
 
                 {isLoading ? (
                     <div className="flex justify-center py-8">
-                        <Loader className="w-5 h-5 text-violet-500 animate-spin" />
+                        <Loader className="w-5 h-5 text-blue-600 animate-spin" />
                     </div>
                 ) : friends.length > 0 ? (
                     <div className="flex-1 overflow-y-auto space-y-3 pr-1">
@@ -273,7 +273,7 @@ const ChatWidget = () => {
                                     value={groupName}
                                     onChange={(e) => setGroupName(e.target.value)}
                                     placeholder="Nhập tên nhóm..."
-                                    className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-violet-600 transition"
+                                    className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-blue-600 transition"
                                 />
                             </div>
                             
@@ -289,7 +289,7 @@ const ChatWidget = () => {
                                                 onClick={() => handleToggleMember(friend.id)}
                                                 className={`flex items-center justify-between p-2 rounded-xl border transition cursor-pointer ${
                                                     selectedMembers.includes(friend.id)
-                                                        ? "bg-violet-50 border border-violet-200"
+                                                        ? "bg-blue-50 border border-blue-200"
                                                         : "bg-slate-50 border-transparent hover:bg-slate-100"
                                                 }`}
                                             >
@@ -305,7 +305,7 @@ const ChatWidget = () => {
                                                     type="checkbox"
                                                     checked={selectedMembers.includes(friend.id)}
                                                     readOnly
-                                                    className="w-3.5 h-3.5 accent-violet-600 rounded border-slate-200 cursor-pointer"
+                                                    className="w-3.5 h-3.5 accent-blue-600 rounded border-slate-200 cursor-pointer"
                                                 />
                                             </div>
                                         ))}
@@ -318,7 +318,7 @@ const ChatWidget = () => {
                             <button
                                 type="submit"
                                 disabled={!groupName.trim() || selectedMembers.length === 0}
-                                className="w-full bg-violet-600 disabled:opacity-50 hover:bg-violet-700 text-white font-semibold py-2 px-4 rounded-xl text-xs transition cursor-pointer shadow-md shadow-violet-500/10"
+                                className="w-full bg-blue-600 disabled:opacity-50 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-xl text-xs transition cursor-pointer shadow-md shadow-blue-600/10"
                             >
                                 Tạo nhóm
                             </button>

@@ -119,7 +119,7 @@ const EditProfileModal = ({ profileUser, onClose, onProfileUpdated }) => {
                             <img
                                 src={avatarPreview || "https://api.dicebear.com/7.x/adventurer/svg?seed=Felix"}
                                 alt="Avatar Preview"
-                                className="w-24 h-24 rounded-full object-cover border-2 border-violet-500/50 shadow-md group-hover:opacity-85 transition"
+                                className="w-24 h-24 rounded-full object-cover border-2 border-blue-500/50 shadow-md group-hover:opacity-85 transition"
                             />
                             <div className="absolute inset-0 bg-black/40 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition">
                                 <Camera className="w-6 h-6 text-white" />
@@ -142,7 +142,7 @@ const EditProfileModal = ({ profileUser, onClose, onProfileUpdated }) => {
                             value={displayName}
                             onChange={(e) => setDisplayName(e.target.value)}
                             placeholder="Nhập tên hiển thị..."
-                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs text-slate-800 focus:outline-none focus:border-violet-600 transition"
+                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs text-slate-800 focus:outline-none focus:border-blue-600 transition"
                             required
                         />
                     </div>
@@ -155,7 +155,7 @@ const EditProfileModal = ({ profileUser, onClose, onProfileUpdated }) => {
                             placeholder="Giới thiệu ngắn về bản thân..."
                             rows={3}
                             maxLength={200}
-                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs text-slate-800 focus:outline-none focus:border-violet-600 transition resize-none"
+                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs text-slate-800 focus:outline-none focus:border-blue-600 transition resize-none"
                         />
                         <span className="block text-[9px] text-right text-slate-400">{bio.length}/200 ký tự</span>
                     </div>
@@ -171,7 +171,7 @@ const EditProfileModal = ({ profileUser, onClose, onProfileUpdated }) => {
                         <button
                             type="submit"
                             disabled={isSubmitting || isUploading}
-                            className="px-5 py-2 bg-gradient-to-r from-violet-600 to-pink-600 hover:from-violet-700 hover:to-pink-700 text-white rounded-xl transition cursor-pointer text-xs font-semibold shadow-md shadow-violet-500/10 flex items-center space-x-1.5 disabled:opacity-50"
+                            className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl transition cursor-pointer text-xs font-semibold shadow-md shadow-blue-600/10 flex items-center space-x-1.5 disabled:opacity-50"
                         >
                             {isSubmitting ? (
                                 <Loader className="w-4 h-4 animate-spin" />
@@ -299,7 +299,7 @@ const Profile = () => {
     if (isLoading) {
         return (
             <div className="flex justify-center items-center py-24">
-                <Loader className="w-8 h-8 text-violet-500 animate-spin" />
+                <Loader className="w-8 h-8 text-blue-600 animate-spin" />
             </div>
         );
     }
@@ -317,7 +317,7 @@ const Profile = () => {
             {/* Thẻ thông tin tài khoản Glassmorphism */}
             <div className="relative bg-white border border-slate-200 rounded-3xl p-8 overflow-hidden shadow-sm">
                 {/* Background phát quang trang cá nhân */}
-                <div className="absolute -top-12 -right-12 w-64 h-64 bg-pink-500/5 rounded-full blur-[96px] pointer-events-none"></div>
+                <div className="absolute -top-12 -right-12 w-64 h-64 bg-blue-500/5 rounded-full blur-[96px] pointer-events-none"></div>
 
                 <div className="flex flex-col md:flex-row items-center md:items-start space-y-6 md:space-y-0 md:space-x-8">
                     {/* Avatar */}
@@ -340,11 +340,11 @@ const Profile = () => {
 
                         <div className="flex flex-wrap justify-center md:justify-start gap-y-2 gap-x-6 text-sm text-slate-650">
                             <span className="flex items-center space-x-2">
-                                <Mail className="w-4 h-4 text-violet-500" />
+                                <Mail className="w-4 h-4 text-blue-600" />
                                 <span>{profileUser.email}</span>
                             </span>
                             <span className="flex items-center space-x-2">
-                                <Calendar className="w-4 h-4 text-pink-500" />
+                                <Calendar className="w-4 h-4 text-cyan-600" />
                                 <span>Đã tham gia: {new Date(profileUser.createdAt || Date.now()).toLocaleDateString()}</span>
                             </span>
                         </div>
@@ -356,7 +356,7 @@ const Profile = () => {
                                 {relation.status === "none" && (
                                     <button
                                         onClick={handleSendRequest}
-                                        className="flex items-center space-x-1.5 px-4 py-2.5 bg-violet-600 hover:bg-violet-700 text-white rounded-xl text-xs font-semibold cursor-pointer transition shadow-md shadow-violet-500/10"
+                                        className="flex items-center space-x-1.5 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold cursor-pointer transition shadow-md shadow-blue-600/10"
                                     >
                                         <UserPlus className="w-4 h-4" />
                                         <span>Thêm bạn bè</span>
@@ -399,7 +399,7 @@ const Profile = () => {
                                     onClick={handleStartChat}
                                     className="flex items-center space-x-1.5 px-4 py-2.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 rounded-xl text-xs font-semibold cursor-pointer transition"
                                 >
-                                    <MessageSquare className="w-4 h-4 text-sky-500" />
+                                    <MessageSquare className="w-4 h-4 text-blue-600" />
                                     <span>Nhắn tin</span>
                                 </button>
                             </div>
@@ -410,7 +410,7 @@ const Profile = () => {
                             <div className="flex flex-wrap gap-3 justify-center md:justify-start pt-2">
                                 <button
                                     onClick={() => setShowEditModal(true)}
-                                    className="flex items-center space-x-1.5 px-4 py-2.5 bg-violet-600 hover:bg-violet-750 text-white rounded-xl text-xs font-semibold cursor-pointer transition shadow-md shadow-violet-500/10"
+                                    className="flex items-center space-x-1.5 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold cursor-pointer transition shadow-md shadow-blue-600/10"
                                 >
                                     <Edit3 className="w-4 h-4" />
                                     <span>Chỉnh sửa trang cá nhân</span>
@@ -424,7 +424,7 @@ const Profile = () => {
             {/* Khu vực danh sách bài đăng */}
             <div className="space-y-6">
                 <div className="flex items-center space-x-2 text-slate-800 border-b border-slate-200 pb-3">
-                    <FileText className="w-5 h-5 text-violet-550" />
+                    <FileText className="w-5 h-5 text-blue-600" />
                     <h3 className="text-xl font-bold">Bài đăng của {isOwnProfile ? "bạn" : profileUser.displayName}</h3>
                     <span className="bg-slate-100 px-2.5 py-0.5 rounded-full text-xs font-semibold text-slate-600">{userPosts.length}</span>
                 </div>

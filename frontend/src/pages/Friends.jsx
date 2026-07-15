@@ -229,7 +229,7 @@ const Friends = () => {
             {/* Header trang */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
-                    <h1 className="text-3xl font-extrabold tracking-tight bg-gradient-to-r from-violet-600 to-pink-600 bg-clip-text text-transparent">Mạng lưới bạn bè</h1>
+                    <h1 className="text-3xl font-extrabold tracking-tight text-slate-900">Mạng lưới bạn bè</h1>
                     <p className="text-slate-650 text-sm mt-1">Kết nối, tìm kiếm bạn mới và phê duyệt lời mời kết bạn.</p>
                 </div>
 
@@ -240,7 +240,7 @@ const Friends = () => {
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
                         placeholder="Tìm bạn bè bằng tên/email..."
-                        className="w-full bg-white border border-slate-200 rounded-xl pl-4 pr-10 py-2.5 text-slate-800 placeholder-slate-400 focus:outline-none focus:border-violet-600 text-sm transition shadow-sm"
+                        className="w-full bg-white border border-slate-200 rounded-xl pl-4 pr-10 py-2.5 text-slate-800 placeholder-slate-400 focus:outline-none focus:border-blue-600 text-sm transition shadow-sm"
                     />
                     <button type="submit" className="absolute right-3 top-2.5 text-slate-400 hover:text-slate-800 cursor-pointer">
                         <Search className="w-5 h-5" />
@@ -252,7 +252,7 @@ const Friends = () => {
             {searchResults.length > 0 && (
                 <div className="bg-white border border-slate-200 rounded-2xl p-6 space-y-4 shadow-sm">
                     <h3 className="text-lg font-bold text-slate-800 flex items-center space-x-2">
-                        <Search className="w-4 h-4 text-violet-500" />
+                        <Search className="w-4 h-4 text-blue-600" />
                         <span>Kết quả tìm kiếm ({searchResults.length})</span>
                     </h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -263,7 +263,7 @@ const Friends = () => {
                                     <Link to={`/profile/${u.id}`} className="flex items-center space-x-3 group cursor-pointer">
                                         <img src={u.avatarUrl || "https://api.dicebear.com/7.x/adventurer/svg?seed=Felix"} className="w-10 h-10 rounded-full border border-slate-200 group-hover:opacity-80 transition object-cover" alt="Avatar" />
                                         <div>
-                                            <p className="font-semibold text-slate-800 text-sm group-hover:text-violet-600 transition">{u.displayName}</p>
+                                            <p className="font-semibold text-slate-800 text-sm group-hover:text-blue-600 transition">{u.displayName}</p>
                                             <p className="text-xs text-slate-500">{u.email}</p>
                                         </div>
                                     </Link>
@@ -285,7 +285,7 @@ const Friends = () => {
                                         </button>
                                     )}
                                     {relation.status === "none" && (
-                                        <button onClick={() => handleSendRequest(u.id)} className="flex items-center space-x-1.5 px-3 py-1.5 bg-violet-50 hover:bg-violet-100 text-violet-600 rounded-lg text-xs cursor-pointer transition border border-violet-200/55">
+                                        <button onClick={() => handleSendRequest(u.id)} className="flex items-center space-x-1.5 px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-600 rounded-lg text-xs cursor-pointer transition border border-blue-200/55">
                                             <UserPlus className="w-4 h-4" />
                                             <span>Kết bạn</span>
                                         </button>
@@ -298,7 +298,7 @@ const Friends = () => {
             )}
 
             {isSearching && (
-                <div className="flex justify-center py-4"><Loader className="w-6 h-6 text-violet-500 animate-spin" /></div>
+                <div className="flex justify-center py-4"><Loader className="w-6 h-6 text-blue-600 animate-spin" /></div>
             )}
 
             {/* HỆ THỐNG TABS ĐIỀU HƯỚNG CHÍNH */}
@@ -306,7 +306,7 @@ const Friends = () => {
                 <button
                     onClick={() => setActiveTab("requests")}
                     className={`flex items-center space-x-2 px-6 py-3 font-semibold text-sm border-b-2 transition cursor-pointer ${
-                        activeTab === "requests" ? "border-violet-600 text-violet-600" : "border-transparent text-slate-500 hover:text-slate-800"
+                        activeTab === "requests" ? "border-blue-600 text-blue-600" : "border-transparent text-slate-500 hover:text-slate-800"
                     }`}
                 >
                     <span>Lời mời ({requests.length})</span>
@@ -314,7 +314,7 @@ const Friends = () => {
                 <button
                     onClick={() => setActiveTab("list")}
                     className={`flex items-center space-x-2 px-6 py-3 font-semibold text-sm border-b-2 transition cursor-pointer ${
-                        activeTab === "list" ? "border-violet-600 text-violet-600" : "border-transparent text-slate-500 hover:text-slate-800"
+                        activeTab === "list" ? "border-blue-600 text-blue-600" : "border-transparent text-slate-500 hover:text-slate-800"
                     }`}
                 >
                     <span>Danh sách bạn bè ({friends.length})</span>
@@ -322,17 +322,17 @@ const Friends = () => {
                 <button
                     onClick={() => setActiveTab("suggestions")}
                     className={`flex items-center space-x-2 px-6 py-3 font-semibold text-sm border-b-2 transition cursor-pointer ${
-                        activeTab === "suggestions" ? "border-violet-600 text-violet-600" : "border-transparent text-slate-500 hover:text-slate-800"
+                        activeTab === "suggestions" ? "border-blue-600 text-blue-600" : "border-transparent text-slate-500 hover:text-slate-800"
                     }`}
                 >
-                    <Sparkles className="w-4 h-4 text-yellow-500" />
+                    <Sparkles className="w-4 h-4 text-amber-500" />
                     <span>Gợi ý bạn bè</span>
                 </button>
             </div>
 
             {/* NỘI DUNG HIỂN THỊ CHO TỪNG TAB */}
             {isLoading ? (
-                <div className="flex justify-center py-12"><Loader className="w-8 h-8 text-violet-500 animate-spin" /></div>
+                <div className="flex justify-center py-12"><Loader className="w-8 h-8 text-blue-600 animate-spin" /></div>
             ) : (
                 <div className="min-h-[200px]">
                     {/* TAB 1: LỜI MỜI ĐÃ NHẬN */}
@@ -344,14 +344,14 @@ const Friends = () => {
                                         <Link to={`/profile/${r.fromUserId}`} className="flex items-center space-x-3 group cursor-pointer">
                                             <img src={r.user?.avatarUrl || "https://api.dicebear.com/7.x/adventurer/svg?seed=Felix"} className="w-12 h-12 rounded-full border border-slate-200 group-hover:opacity-80 transition object-cover" alt="Avatar" />
                                             <div>
-                                                <p className="font-bold text-slate-800 group-hover:text-violet-600 transition">{r.user?.displayName}</p>
+                                                <p className="font-bold text-slate-800 group-hover:text-blue-600 transition">{r.user?.displayName}</p>
                                                 <p className="text-xs text-slate-500">Gửi lúc: {new Date(r.createdAt).toLocaleDateString()}</p>
                                             </div>
                                         </Link>
                                         <div className="flex space-x-2">
                                             <button
                                                 onClick={() => handleAccept(r.id, r.fromUserId)}
-                                                className="px-3.5 py-2 bg-gradient-to-r from-violet-600 to-pink-600 text-white rounded-xl text-xs font-semibold cursor-pointer transition hover:opacity-90 shadow-md shadow-violet-500/10"
+                                                className="px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold cursor-pointer transition shadow-md shadow-blue-600/10"
                                             >
                                                 Đồng ý
                                             </button>
@@ -377,10 +377,10 @@ const Friends = () => {
                                 {friends.map(f => (
                                     <div key={f.id} className="bg-white border border-slate-200 rounded-2xl p-4 flex flex-col items-center text-center space-y-3 shadow-sm">
                                         <Link to={`/profile/${f.id}`} className="group block cursor-pointer">
-                                            <img src={f.avatarUrl || "https://api.dicebear.com/7.x/adventurer/svg?seed=Felix"} className="w-16 h-16 rounded-full border-2 border-violet-500/20 group-hover:opacity-80 transition object-cover" alt="Avatar" />
+                                            <img src={f.avatarUrl || "https://api.dicebear.com/7.x/adventurer/svg?seed=Felix"} className="w-16 h-16 rounded-full border-2 border-blue-500/20 group-hover:opacity-80 transition object-cover" alt="Avatar" />
                                         </Link>
                                         <div>
-                                            <Link to={`/profile/${f.id}`} className="font-bold text-slate-800 text-sm hover:text-violet-600 transition block truncate max-w-[150px]">{f.displayName}</Link>
+                                            <Link to={`/profile/${f.id}`} className="font-bold text-slate-800 text-sm hover:text-blue-600 transition block truncate max-w-[150px]">{f.displayName}</Link>
                                             <p className="text-[11px] text-slate-500 truncate max-w-[150px]">{f.email}</p>
                                         </div>
                                         <button
@@ -407,13 +407,13 @@ const Friends = () => {
                                         <Link to={`/profile/${s.id}`} className="flex items-center space-x-3 group cursor-pointer">
                                             <img src={s.avatarUrl || "https://api.dicebear.com/7.x/adventurer/svg?seed=Felix"} className="w-12 h-12 rounded-full border border-slate-200 group-hover:opacity-80 transition object-cover" alt="Avatar" />
                                             <div>
-                                                <p className="font-bold text-slate-800 group-hover:text-violet-600 transition">{s.displayName}</p>
-                                                <p className="text-xs text-violet-600 font-medium">{s.mutualFriendCount} bạn chung</p>
+                                                <p className="font-bold text-slate-800 group-hover:text-blue-600 transition">{s.displayName}</p>
+                                                <p className="text-xs text-blue-600 font-medium">{s.mutualFriendCount} bạn chung</p>
                                             </div>
                                         </Link>
                                         <button
                                             onClick={() => handleSendRequest(s.id)}
-                                            className="px-4 py-2 bg-violet-50 hover:bg-violet-100 text-violet-600 rounded-xl text-xs font-semibold cursor-pointer transition border border-violet-250/50"
+                                            className="px-4 py-2 bg-blue-50 hover:bg-blue-100 text-blue-600 rounded-xl text-xs font-semibold cursor-pointer transition border border-blue-200"
                                         >
                                             Thêm bạn
                                         </button>

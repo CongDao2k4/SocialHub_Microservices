@@ -1,9 +1,8 @@
-import { Outlet, Link, useNavigate, useLocation } from "react-router-dom";
-import { useAuth } from "../context/AuthContext";
-import { useSocket } from "../context/SocketContext";
+import {Outlet, Link, useNavigate, useLocation} from "react-router-dom";
+import {useAuth} from "../context/AuthContext";
+import {useSocket} from "../context/SocketContext";
 import ChatWidget from "./ChatWidget"; // <-- Import thêm ChatWidget
-import { Home, Users, User, LogOut, Radio, Bell, MessageSquare } from "lucide-react";
-
+import {Home, Users, User, LogOut, Bell, MessageSquare} from "lucide-react";
 const Layout = () => {
     const { user, logout } = useAuth();
     const { unreadCount, toast, setToast } = useSocket();
@@ -11,6 +10,21 @@ const Layout = () => {
     const location = useLocation();
 
     const isMessagesPage = location.pathname === "/messages";
+
+    // Helper: trả về className cho nav link dựa trên active state
+    const navLinkClass = (path) => {
+        const isActive = path === "/" ? location.pathname === "/" : location.pathname.startsWith(path);
+        return isActive
+            ? "flex items-center space-x-3 px-4 py-2.5 rounded-xl bg-blue-50 text-blue-700 font-semibold transition"
+            : "flex items-center space-x-3 px-4 py-2.5 rounded-xl hover:bg-slate-100 text-slate-600 transition group";
+    };
+
+    const navIconClass = (path) => {
+        const isActive = path === "/" ? location.pathname === "/" : location.pathname.startsWith(path);
+        return isActive
+            ? "w-5 h-5 text-blue-600"
+            : "w-5 h-5 text-slate-400 group-hover:text-blue-600";
+    };
 
     const handleLogout = async () => {
         await logout();
@@ -37,21 +51,21 @@ const Layout = () => {
     };
 
     return (
-        <div className="min-h-screen bg-slate-100 text-slate-900 flex">
-            {/* Toast thông báo nổi thời gian thực */}
+        <div className="min-h-screen bg-slate-50 text-slate-900 flex">
+            {/* Toast Thông báo Realtime */}
             {toast && (
                 <div
                     onClick={() => handleToastClick(toast)}
-                    className="fixed top-6 right-6 z-50 flex items-center space-x-3 bg-white/95 backdrop-blur-xl border border-slate-200/80 px-5 py-4 rounded-2xl shadow-xl animate-bounce-short max-w-sm cursor-pointer hover:bg-slate-50 transition"
+                    className="fixed top-5 right-5 z-[9999] bg-white border-l-4 border-blue-600 shadow-xl shadow-slate-200/60 rounded-xl p-4 flex items-center space-x-3.5 cursor-pointer max-w-sm hover:shadow-2xl transition-shadow duration-300 animate-slide-in-right"
                 >
                     <img
-                        src={toast.avatarUrl || "https://api.dicebear.com/7.x/adventurer/svg?seed=Felix"}
-                        className="w-10 h-10 rounded-full border border-slate-200 shrink-0"
-                        alt="Avatar"
+                        src={toast.fromUser?.avatarUrl || "https://api.dicebear.com/7.x/adventurer/svg?seed=Felix"}
+                        className="w-10 h-10 rounded-full border border-slate-200 object-cover shrink-0"
+                        alt="Sender Avatar"
                     />
                     <div className="flex-1 min-w-0">
                         <p className="text-slate-800 text-sm font-semibold truncate-2-lines">{toast.message}</p>
-                        <p className="text-violet-600 text-xs mt-0.5 font-medium">Bấm để xem chi tiết →</p>
+                        <p className="text-blue-600 text-xs mt-0.5 font-medium">Bấm để xem chi tiết →</p>
                     </div>
                 </div>
             )}
@@ -60,34 +74,38 @@ const Layout = () => {
             <aside className="w-64 bg-white border-r border-slate-200 p-6 flex flex-col justify-between fixed h-screen">
                 <div className="space-y-8">
                     {/* Brand Logo */}
-                    <div className="flex items-center space-x-3">
-                        <div className="p-2 bg-gradient-to-tr from-violet-500 to-pink-500 rounded-xl">
-                            <Radio className="w-6 h-6 text-white" />
-                        </div>
-                        <span className="text-xl font-bold tracking-tight text-slate-800">SocialHub</span>
-                    </div>
+                    <Link to="/" className="flex items-center space-x-3 group cursor-pointer select-none">
+                        <img
+                            src="/logo.svg"
+                            alt="SocialHub Logo"
+                            className="w-10 h-10 object-contain group-hover:scale-105 transition duration-200"
+                        />
+                        <span className="text-xl font-bold tracking-tight text-slate-800 group-hover:text-blue-600 transition duration-200">
+                            SocialHub
+                        </span>
+                    </Link>
 
                     {/* Navigation Links */}
-                    <nav className="space-y-2">
-                        <Link to="/" className="flex items-center space-x-3 px-4 py-3 rounded-xl hover:bg-slate-100 text-slate-700 transition group">
-                            <Home className="w-5 h-5 text-slate-500 group-hover:text-violet-600" />
+                    <nav className="space-y-1">
+                        <Link to="/" className={navLinkClass("/")}>
+                            <Home className={navIconClass("/")} />
                             <span>Bảng tin</span>
                         </Link>
-                        <Link to="/friends" className="flex items-center space-x-3 px-4 py-3 rounded-xl hover:bg-slate-100 text-slate-700 transition group">
-                            <Users className="w-5 h-5 text-slate-500 group-hover:text-violet-600" />
+                        <Link to="/friends" className={navLinkClass("/friends")}>
+                            <Users className={navIconClass("/friends")} />
                             <span>Bạn bè</span>
                         </Link>
-                        <Link to="/messages" className="flex items-center space-x-3 px-4 py-3 rounded-xl hover:bg-slate-100 text-slate-700 transition group">
-                            <MessageSquare className="w-5 h-5 text-slate-500 group-hover:text-violet-600" />
+                        <Link to="/messages" className={navLinkClass("/messages")}>
+                            <MessageSquare className={navIconClass("/messages")} />
                             <span>Tin nhắn</span>
                         </Link>
-                        <Link to="/notifications" className="flex items-center justify-between px-4 py-3 rounded-xl hover:bg-slate-100 text-slate-700 transition group">
+                        <Link to="/notifications" className={`${navLinkClass("/notifications")} justify-between`}>
                             <div className="flex items-center space-x-3">
-                                <Bell className="w-5 h-5 text-slate-500 group-hover:text-violet-600" />
+                                <Bell className={navIconClass("/notifications")} />
                                 <span>Thông báo</span>
                             </div>
                             {unreadCount > 0 && (
-                                <span className="bg-rose-500 text-white font-bold text-[10px] px-2 py-0.5 rounded-full min-w-[20px] text-center shadow-md shadow-rose-500/20">
+                                <span className="bg-red-500 text-white font-bold text-[10px] px-2 py-0.5 rounded-full min-w-[20px] text-center">
                                     {unreadCount}
                                 </span>
                             )}
@@ -96,10 +114,10 @@ const Layout = () => {
                 </div>
 
                 {/* Phần thông tin user đăng nhập ở đáy Sidebar */}
-                <div className="pt-6 border-t border-slate-150 space-y-4">
+                <div className="pt-6 border-t border-slate-100 space-y-3">
                     <Link
                         to={`/profile/${user?.id}`}
-                        className="flex items-center space-x-3 cursor-pointer group hover:bg-slate-100 p-2 rounded-xl transition"
+                        className="flex items-center space-x-3 cursor-pointer group hover:bg-slate-50 p-2.5 rounded-xl transition"
                     >
                         <img
                             src={user?.avatarUrl || "https://api.dicebear.com/7.x/adventurer/svg?seed=Felix"}
@@ -107,14 +125,14 @@ const Layout = () => {
                             className="w-10 h-10 rounded-full border border-slate-200 object-cover"
                         />
                         <div className="truncate">
-                            <p className="font-semibold text-sm text-slate-800 group-hover:text-violet-600 transition">{user?.displayName}</p>
-                            <p className="text-xs text-slate-500 truncate">{user?.email}</p>
+                            <p className="font-semibold text-sm text-slate-800 group-hover:text-blue-600 transition">{user?.displayName}</p>
+                            <p className="text-xs text-slate-400 truncate">{user?.email}</p>
                         </div>
                     </Link>
 
                     <button
                         onClick={handleLogout}
-                        className="w-full flex items-center justify-center space-x-2 bg-rose-50 hover:bg-rose-100 text-rose-600 py-2.5 rounded-xl transition cursor-pointer text-sm border border-rose-200/50"
+                        className="w-full flex items-center justify-center space-x-2 bg-slate-50 hover:bg-red-50 text-slate-500 hover:text-red-600 py-2.5 rounded-xl transition cursor-pointer text-sm border border-slate-200 hover:border-red-200"
                     >
                         <LogOut className="w-4 h-4" />
                         <span>Đăng xuất</span>

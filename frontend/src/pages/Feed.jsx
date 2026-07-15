@@ -64,7 +64,7 @@ const Feed = () => {
         <div className="space-y-6">
             {/* Tiêu đề trang */}
             <div className="mb-6">
-                <h1 className="text-3xl font-extrabold tracking-tight bg-gradient-to-r from-violet-600 to-pink-600 bg-clip-text text-transparent">Bảng Tin</h1>
+                <h1 className="text-3xl font-extrabold tracking-tight text-slate-900">Bảng Tin</h1>
                 <p className="text-slate-600 text-sm mt-1">Cập nhật những hoạt động mới nhất từ bạn bè của bạn.</p>
             </div>
 
@@ -74,7 +74,7 @@ const Feed = () => {
             {/* Danh sách bài viết */}
             {isLoading ? (
                 <div className="flex justify-center py-12">
-                    <Loader className="w-8 h-8 text-violet-500 animate-spin" />
+                    <Loader className="w-8 h-8 text-blue-600 animate-spin" />
                 </div>
             ) : posts.length > 0 ? (
                 <div className="space-y-6">

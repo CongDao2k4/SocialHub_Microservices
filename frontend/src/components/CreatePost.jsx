@@ -153,7 +153,7 @@ const CreatePost = ({ onPostCreated }) => {
                         className="flex items-center space-x-2 px-4 py-2 bg-slate-50 hover:bg-slate-100 rounded-xl text-slate-650 border border-slate-200 transition cursor-pointer disabled:opacity-50 text-sm font-medium"
                     >
                         <Image className="w-5 h-5 text-emerald-500" />
-                        <Video className="w-5 h-5 text-violet-500" />
+                        <Video className="w-5 h-5 text-blue-600" />
                         <span>Ảnh / Video</span>
                     </button>
 
@@ -161,7 +161,7 @@ const CreatePost = ({ onPostCreated }) => {
                     <button
                         type="submit"
                         disabled={isSubmitting || (!content.trim() && selectedFiles.length === 0)}
-                        className="flex items-center space-x-2 px-5 py-2.5 bg-gradient-to-r from-violet-600 to-pink-600 hover:from-violet-700 hover:to-pink-700 rounded-xl text-white font-semibold transition duration-200 transform active:scale-95 disabled:opacity-50 cursor-pointer text-sm shadow-md shadow-violet-500/10"
+                        className="flex items-center space-x-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 rounded-xl text-white font-semibold transition duration-200 transform active:scale-95 disabled:opacity-50 cursor-pointer text-sm shadow-md shadow-blue-600/10"
                     >
                         {isSubmitting ? (
                             <Loader className="w-4 h-4 animate-spin" />
