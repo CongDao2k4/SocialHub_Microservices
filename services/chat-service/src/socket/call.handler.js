@@ -19,12 +19,12 @@ export default (io, socket) => {
 
       console.log(`📞 [CALL] User ${currentUserId} (${socket.displayName}) initiating ${callType} call to ${targetUserId}`);
 
-      // Check if target user is online in Redis OR has an active socket room
-      const isOnlineRedis = await redisClient.get(`online:${targetUserId}`);
-      const isOnlineRoom = io.sockets.adapter.rooms.has(`user:${targetUserId}`);
+      // Check if target user has active sockets in the personal room across the cluster
+      const targetSockets = await io.in(`user:${targetUserId}`).fetchSockets();
+      const isOnline = targetSockets.length > 0;
 
-      if (!isOnlineRedis && !isOnlineRoom) {
-        console.log(`⚠️ [CALL] Target user ${targetUserId} is offline (Redis=${!!isOnlineRedis}, Room=${isOnlineRoom})`);
+      if (!isOnline) {
+        console.log(`⚠️ [CALL] Target user ${targetUserId} is offline (Active Sockets = 0)`);
         return socket.emit('call:rejected', {
           calleeId: targetUserId,
           reason: 'offline'

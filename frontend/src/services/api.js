@@ -35,7 +35,7 @@ api.interceptors.request.use(
 
 const resolveUrls = (obj) => {
     if (!obj || typeof obj !== "object") return obj;
-    
+
     if (Array.isArray(obj)) {
         for (let i = 0; i < obj.length; i++) {
             resolveUrls(obj[i]);
@@ -58,11 +58,17 @@ const resolveUrls = (obj) => {
                     if (!val.startsWith("http")) {
                         const cleanVal = val.startsWith("/") ? val : `/${val}`;
                         resolvedUrl = `${api.defaults.baseURL}${cleanVal}`;
-                    } else if (val.includes("localhost:") && !window.location.hostname.includes("localhost")) {
-                        // Nếu đang chạy trên production (Vercel) nhưng avatarUrl chứa localhost, chuyển đổi về gateway đúng
-                        if (val.includes("/media/file/")) {
-                            const mediaId = val.split("/media/file/").pop();
-                            resolvedUrl = `${api.defaults.baseURL}/media/file/${mediaId}`;
+                    } else {
+                        // Nếu đang chạy trên production (Vercel) nhưng avatarUrl chứa localhost hoặc domain trycloudflare/ngrok cũ trong DB, chuyển đổi về gateway đúng
+                        try {
+                            const currentOrigin = new URL(api.defaults.baseURL).origin;
+                            const urlObj = new URL(val);
+                            if (urlObj.origin !== currentOrigin && val.includes("/media/file/")) {
+                                const mediaId = val.split("/media/file/").pop().split("?")[0];
+                                resolvedUrl = `${api.defaults.baseURL}/media/file/${mediaId}`;
+                            }
+                        } catch (e) {
+                            // Bỏ qua nếu url không đúng định dạng
                         }
                     }
 

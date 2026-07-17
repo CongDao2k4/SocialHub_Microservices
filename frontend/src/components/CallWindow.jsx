@@ -1,11 +1,22 @@
 import { useState, useEffect, useRef } from "react";
 import { Mic, MicOff, Video, VideoOff, PhoneOff, Maximize2, Minimize2 } from "lucide-react";
 
+// Cấu hình ICE Servers cho WebRTC.
+// TRÊN PRODUCTION: Để vượt qua tường lửa đối xứng (Symmetric NAT) của 3G/4G/5G hoặc wifi công ty,
+// bạn bắt buộc phải cấu hình thêm ít nhất một TURN Server (ví dụ: Coturn, Twilio, Xirsys).
 const ICE_SERVERS = {
     iceServers: [
         { urls: "stun:stun.l.google.com:19302" },
         { urls: "stun:stun1.l.google.com:19302" },
-        { urls: "stun:stun2.l.google.com:19302" }
+        { urls: "stun:stun2.l.google.com:19302" },
+        // Cấu hình mẫu TURN Server (bỏ comment và điền thông tin khi deploy thực tế):
+        /*
+        {
+            urls: "turn:your-turn-server.com:3478",
+            username: "your-username",
+            credential: "your-password"
+        }
+        */
     ]
 };
 

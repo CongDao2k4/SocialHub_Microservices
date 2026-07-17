@@ -39,61 +39,12 @@ const startServer = async () => {
 
     // Handle WebSocket upgrades for Socket.IO proxying
     server.on('upgrade', (req, socket, head) => {
-      let targetServiceUrl = null;
-      let targetPath = req.url;
-
       if (req.url && req.url.startsWith('/notification/socket.io/')) {
-        targetServiceUrl = config.NOTIFICATION_SERVICE_URL;
-        targetPath = req.url.replace(/^\/notification/, '');
+        req.url = req.url.replace(/^\/notification/, '');
+        wsProxy.ws(req, socket, head, { target: config.NOTIFICATION_SERVICE_URL });
       } else if (req.url && req.url.startsWith('/chat/socket.io/')) {
-        targetServiceUrl = config.CHAT_SERVICE_URL;
-        targetPath = req.url.replace(/^\/chat/, '');
-      }
-
-      if (targetServiceUrl) {
-        try {
-          const targetUrl = new URL(targetServiceUrl);
-          const targetPort = targetUrl.port || (targetUrl.protocol === 'https:' ? 443 : 80);
-          const targetHost = targetUrl.hostname;
-
-          const proxyReq = http.request({
-            host: targetHost,
-            port: targetPort,
-            path: targetPath,
-            method: req.method,
-            headers: req.headers
-          });
-
-          proxyReq.on('upgrade', (proxyRes, proxySocket, proxyHead) => {
-            // Handle socket errors to prevent app crashes on client/service disconnects (like ECONNRESET)
-            socket.on('error', (err) => {
-              console.error('[ERROR] WS Client socket error:', err.message);
-              proxySocket.destroy();
-            });
-            proxySocket.on('error', (err) => {
-              console.error('[ERROR] WS Proxy socket error:', err.message);
-              socket.destroy();
-            });
-
-            socket.write('HTTP/1.1 101 Switching Protocols\r\n');
-            Object.keys(proxyRes.headers).forEach((key) => {
-              socket.write(`${key}: ${proxyRes.headers[key]}\r\n`);
-            });
-            socket.write('\r\n');
-
-            proxySocket.pipe(socket).pipe(proxySocket);
-          });
-
-          proxyReq.on('error', (err) => {
-            console.error('[ERROR] WS Proxy Upgrade Error:', err.message);
-            socket.end();
-          });
-
-          proxyReq.end();
-        } catch (err) {
-          console.error('[ERROR] Failed to upgrade WS connection:', err.message);
-          socket.end();
-        }
+        req.url = req.url.replace(/^\/chat/, '');
+        wsProxy.ws(req, socket, head, { target: config.CHAT_SERVICE_URL });
       } else {
         console.warn(`[WARN] WS Upgrade request received for unsupported path: ${req.url}`);
         socket.end();
