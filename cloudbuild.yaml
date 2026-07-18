@@ -135,5 +135,5 @@ options:
 
 # --- Cấu hình tham số truyền động từ Trigger GCP ---
 substitutions:
-  _VITE_API_URL: "https://api-local.socialhubzz.cloud"
+  _VITE_API_URL: "https://api.socialhubzz.cloud"
 

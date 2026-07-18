@@ -184,10 +184,14 @@ Tìm cột **`EXTERNAL-IP`** của 2 dịch vụ sau:
 ### Bước 3: Build và Deploy Frontend lên GKE
 Khi build frontend để đẩy lên GKE thông qua Cloud Build, tệp cấu hình đã được thiết lập mặc định để nhận tên miền HTTPS:
 1. Kiểm tra file `cloudbuild.yaml` đã trỏ đúng tên miền API Gateway của bạn ở phần substitutions:
+  `socialhubzz.cloud` là tên miền thì điền
    ```yaml
    substitutions:
-     _VITE_API_URL: "https://api.yourdomain.com"
+     _VITE_API_URL: "https://api.socialhubzz.cloud"
    ```
+   
+   Vì `api` là ứng với `gateway` ở step 2.
+   
 2. Thực hiện Trigger Cloud Build để đóng gói và triển khai lên cụm GKE.
 
 ### Bước 4: Kiểm tra và Vận hành

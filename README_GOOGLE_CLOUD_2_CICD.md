@@ -382,7 +382,7 @@ Khi kết thúc ngày làm việc hoặc khi không kiểm thử, hãy hạ số
     ```bash
     kubectl scale deployment --all --replicas=0 -n default
     ```
-*   **Bật lại hệ thống khi tiếp tục code (Nâng lên 1)**:
+*   **Bật lại hệ thống khi tiếp tục code (Nâng lên 1)** - Cần nhớ hết các service và pod nhé:
     ```bash
     kubectl scale deployment frontend gateway user-service friend-service post-service media-service notification-service chat-service rabbitmq redis --replicas=1 -n default
     ```

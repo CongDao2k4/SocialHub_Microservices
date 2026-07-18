@@ -122,3 +122,24 @@ sudo docker run -d \
    - **Proxy status**: **TẮT ĐÁM MÂY MÀU CAM** (chuyển sang màu xám - **DNS Only**). Điều này bắt buộc để Cloudflare không can thiệp và chặn các gói tin UDP.
 
 ---
+
+## Tích hợp cấu hình vào Source Code Frontend
+
+Mở file [CallWindow.jsx](file:///d:/Hoc_tap_Project_complete/SocialHub_Microservices/frontend/src/components/CallWindow.jsx) trong source code frontend của bạn và thay thế biến `ICE_SERVERS` tương ứng với phương án bạn chọn:
+
+### Cấu hình cho máy chủ tự host Oracle Cloud (Phương án A):
+```javascript
+const ICE_SERVERS = {
+    iceServers: [
+        { urls: "stun:stun.l.google.com:19302" },
+        { urls: "stun:stun1.l.google.com:19302" },
+        { urls: "stun:stun2.l.google.com:19302" },
+        // Cấu hình máy chủ Coturn tự host trên Oracle Cloud:
+        {
+            urls: "turn:turn.socialhubzz.cloud:3478",
+            username: "socialhub_user",
+            credential: "socialhub_secret_pass"
+        }
+    ]
+};
+```
