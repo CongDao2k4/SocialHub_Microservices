@@ -7,24 +7,49 @@ import Conversation from '../models/conversation.model.js';
 export const handleUserOnline = async (io, socket) => {
   const { userId } = socket;
 
-  // Set presence key in Redis (TTL 5 minutes)
+  // 1. Set presence key in Redis (TTL 5 minutes)
   await redisClient.setex(`online:${userId}`, 300, 'true');
 
-  // Find all conversations containing this user
+  // 2. Join a personal room for single-recipient targeting
+  socket.join(`user:${userId}`);
+
+  // 3. Find all conversations containing this user
   const conversations = await Conversation.find({ 'participants.userId': userId });
 
-  // Join the user socket to all conversation rooms and notify others
+  const initialOnlineMap = {};
+  const otherParticipantIds = new Set();
+
+  // 4. Join conversation rooms and notify existing members
   conversations.forEach(conv => {
     const roomId = `conv:${conv._id.toString()}`;
     socket.join(roomId);
 
     // Broadcast user:online to the room (excluding sender)
     socket.to(roomId).emit('user:online', { userId });
+
+    conv.participants.forEach(p => {
+      if (String(p.userId) !== String(userId)) {
+        otherParticipantIds.add(p.userId);
+      }
+    });
   });
 
-  // Join a personal room for single-recipient targeting (like new conversation invites)
-  socket.join(`user:${userId}`);
-  console.log(`🟢 User ${userId} (${socket.displayName}) is online`);
+  // 5. Query current online status for all peers in user's conversations
+  for (const otherId of otherParticipantIds) {
+    const otherSockets = await io.in(`user:${otherId}`).fetchSockets();
+    if (otherSockets.length > 0) {
+      initialOnlineMap[otherId] = true;
+    } else {
+      const isRedisOnline = await redisClient.get(`online:${otherId}`);
+      if (isRedisOnline) {
+        initialOnlineMap[otherId] = true;
+      }
+    }
+  }
+
+  // 6. Send initial presence snapshot to the newly connected user
+  socket.emit('presence:initial', { onlineUsers: initialOnlineMap });
+  console.log(`🟢 User ${userId} (${socket.displayName}) is online. Sent ${Object.keys(initialOnlineMap).length} initial online peers.`);
 };
 
 /**
@@ -32,6 +57,13 @@ export const handleUserOnline = async (io, socket) => {
  */
 export const handleUserOffline = async (io, socket) => {
   const { userId } = socket;
+
+  // Check if user still has remaining active sockets (e.g., other tabs or instant reconnect)
+  const remainingSockets = await io.in(`user:${userId}`).fetchSockets();
+  if (remainingSockets.length > 0) {
+    console.log(`🟡 User ${userId} closed 1 socket but still has ${remainingSockets.length} active connection(s)`);
+    return;
+  }
 
   // Remove presence key from Redis
   await redisClient.del(`online:${userId}`);
@@ -43,7 +75,7 @@ export const handleUserOffline = async (io, socket) => {
     socket.to(roomId).emit('user:offline', { userId });
   });
 
-  console.log(`🔴 User ${userId} (${socket.displayName}) went offline`);
+  console.log(`🔴 User ${userId} (${socket.displayName}) went offline (All sockets closed)`);
 };
 
 /**

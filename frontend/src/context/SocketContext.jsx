@@ -145,6 +145,13 @@ export const SocketProvider = ({ children }) => {
         });
 
         // Lắng nghe trạng thái trực tuyến của người dùng khác
+        chSock.on("presence:initial", ({ onlineUsers: initOnline }) => {
+            console.log("🟢 [PRESENCE] Nhận ảnh trạng thái online ban đầu:", initOnline);
+            if (initOnline) {
+                setOnlineUsers(prev => ({ ...prev, ...initOnline }));
+            }
+        });
+
         chSock.on("user:online", ({ userId }) => {
             console.log(`🟢 User ${userId} online`);
             setOnlineUsers(prev => ({ ...prev, [userId]: true }));

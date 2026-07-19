@@ -37,7 +37,7 @@ const formatLastMessagePreview = (lastMsg) => {
 const Messages = () => {
     const {user: currentUser} = useAuth();
     const navigate = useNavigate();
-    const {onlineUsers, chatSocket, initiateCall} = useSocket();
+    const {onlineUsers, setOnlineUsers, chatSocket, initiateCall} = useSocket();
 
     const [conversations, setConversations] = useState([]);
     const [selectedConv, setSelectedConv] = useState(null);
@@ -89,7 +89,17 @@ const Messages = () => {
         try {
             const res = await api.get("/conversations");
             if (res.data && res.data.success) {
-                setConversations(res.data.data || []);
+                const convs = res.data.data || [];
+                setConversations(convs);
+
+                // Cập nhật ngay trạng thái online ban đầu từ danh sách hội thoại
+                convs.forEach((conv) => {
+                    conv.participants?.forEach((p) => {
+                        if (p.isOnline && p.userId !== currentUser?.id) {
+                            setOnlineUsers((prev) => ({ ...prev, [p.userId]: true }));
+                        }
+                    });
+                });
             }
         } catch (err) {
             console.error("❌ Lỗi lấy danh sách hội thoại:", err.message);
