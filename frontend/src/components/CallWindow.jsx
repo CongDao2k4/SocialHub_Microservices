@@ -65,13 +65,13 @@ const CallWindow = ({ activeCall, chatSocket, currentUserId, onClose }) => {
     const [isMinimized, setIsMinimized] = useState(false);
 
     // Dành cho Cuộc gọi nhóm: Danh sách các thành viên đang tham gia cuộc gọi
-    const [groupParticipants, setGroupParticipants] = useState([]); // [{ userId, displayName, avatarUrl, stream }]
+    const [groupParticipants, setGroupParticipants] = useState([]);
 
     const localVideoRef = useRef(null);
     const remoteVideoRef = useRef(null);
     const remoteAudioRef = useRef(null);
     const peerConnectionRef = useRef(null);
-    const groupPeersRef = useRef({}); // { [peerUserId]: { pc, stream, displayName, avatarUrl } }
+    const groupPeersRef = useRef({});
     const localStreamRef = useRef(null);
     const pendingCandidatesRef = useRef([]);
     const pendingOfferRef = useRef(null);
@@ -95,6 +95,34 @@ const CallWindow = ({ activeCall, chatSocket, currentUserId, onClose }) => {
         };
     };
 
+    // Helper xử lý SDP Offer 1-1 (bao gồm cả khi Offer đến trước khi media sẵn sàng)
+    const process1on1Offer = async (pc, sdp, targetId) => {
+        try {
+            console.log("📥 [WEBRTC 1-1] Xử lý SDP Offer từ đối phương:", targetId);
+            await pc.setRemoteDescription(new RTCSessionDescription(sdp));
+            const rawAnswer = await pc.createAnswer();
+            const answer = tuneOpusAudioSDP(rawAnswer);
+            await pc.setLocalDescription(answer);
+
+            chatSocket.emit("webrtc:answer", {
+                targetUserId: targetId,
+                sdp: answer
+            });
+
+            // Xử lý các ICE Candidate đến sớm nằm trong bộ đệm
+            while (pendingCandidatesRef.current.length > 0) {
+                const candidate = pendingCandidatesRef.current.shift();
+                try {
+                    await pc.addIceCandidate(new RTCIceCandidate(candidate));
+                } catch (e) {
+                    console.warn("⚠️ Lỗi thêm pending ICE candidate 1-1:", e.message);
+                }
+            }
+        } catch (err) {
+            console.error("❌ Lỗi xử lý SDP Offer 1-1:", err);
+        }
+    };
+
     // Helper tạo PeerConnection cho một thành viên trong nhóm
     const createPeerConnectionForGroupMember = async (peerUserId, peerDisplayName, peerAvatarUrl, iceConfig) => {
         if (groupPeersRef.current[peerUserId]?.pc) {
@@ -103,7 +131,6 @@ const CallWindow = ({ activeCall, chatSocket, currentUserId, onClose }) => {
 
         const pc = new RTCPeerConnection(iceConfig);
 
-        // Add local tracks to peer connection
         if (localStreamRef.current) {
             localStreamRef.current.getTracks().forEach(track => {
                 pc.addTrack(track, localStreamRef.current);
@@ -224,6 +251,7 @@ const CallWindow = ({ activeCall, chatSocket, currentUserId, onClose }) => {
                     stream.getTracks().forEach(track => pc.addTrack(track, stream));
 
                     pc.ontrack = (event) => {
+                        console.log("⚡ [WEBRTC 1-1] Nhận luồng remote media thành công:", event.streams[0]);
                         const remoteStream = event.streams[0];
                         if (remoteStream) {
                             if (remoteVideoRef.current) remoteVideoRef.current.srcObject = remoteStream;
@@ -246,6 +274,11 @@ const CallWindow = ({ activeCall, chatSocket, currentUserId, onClose }) => {
                             targetUserId: targetTargetId,
                             callType
                         });
+                    } else if (pendingOfferRef.current) {
+                        // Nếu là Callee và đã nhận Offer nằm trong bộ đệm khi media đang khởi tạo
+                        const offerToProcess = pendingOfferRef.current;
+                        pendingOfferRef.current = null;
+                        await process1on1Offer(pc, offerToProcess, targetTargetId);
                     }
                 }
 
@@ -310,8 +343,9 @@ const CallWindow = ({ activeCall, chatSocket, currentUserId, onClose }) => {
             setGroupParticipants(prev => prev.filter(p => p.userId !== userId));
         };
 
-        // --- XỬ LÝ SỰ KIỆN WEBRTC P2P (DÙNG CHUNG) ---
+        // --- XỬ LÝ SỰ KIỆN WEBRTC P2P (DÙNG CHUNG / 1-1) ---
         const handleCallAccepted = async () => {
+            console.log("✅ [CALL 1-1] Đối phương đã nghe máy, đang tạo SDP Offer...");
             setCallStatus("connected");
             if (!isGroup && peerConnectionRef.current) {
                 const rawOffer = await peerConnectionRef.current.createOffer();
@@ -343,18 +377,15 @@ const CallWindow = ({ activeCall, chatSocket, currentUserId, onClose }) => {
                     sdp: answer
                 });
             } else {
-                if (senderId !== targetTargetId) return;
+                if (String(senderId) !== String(targetTargetId)) return;
                 const pc = peerConnectionRef.current;
-                if (!pc) return;
-                await pc.setRemoteDescription(new RTCSessionDescription(sdp));
-                const rawAnswer = await pc.createAnswer();
-                const answer = tuneOpusAudioSDP(rawAnswer);
-                await pc.setLocalDescription(answer);
+                if (!pc || !isMediaReadyRef.current) {
+                    console.log("⏳ [WEBRTC 1-1] PeerConnection/Media chưa sẵn sàng, lưu SDP Offer vào bộ đệm pending");
+                    pendingOfferRef.current = sdp;
+                    return;
+                }
 
-                chatSocket.emit("webrtc:answer", {
-                    targetUserId: targetTargetId,
-                    sdp: answer
-                });
+                await process1on1Offer(pc, sdp, senderId);
             }
         };
 
@@ -365,10 +396,19 @@ const CallWindow = ({ activeCall, chatSocket, currentUserId, onClose }) => {
                     await peerObj.pc.setRemoteDescription(new RTCSessionDescription(sdp));
                 }
             } else {
-                if (senderId !== targetTargetId) return;
+                if (String(senderId) !== String(targetTargetId)) return;
                 const pc = peerConnectionRef.current;
                 if (pc) {
+                    console.log("📥 [WEBRTC 1-1] Nhận SDP Answer từ đối phương:", senderId);
                     await pc.setRemoteDescription(new RTCSessionDescription(sdp));
+
+                    // Flush các candidate đến trước trong bộ đệm
+                    while (pendingCandidatesRef.current.length > 0) {
+                        const candidate = pendingCandidatesRef.current.shift();
+                        try {
+                            await pc.addIceCandidate(new RTCIceCandidate(candidate));
+                        } catch (e) {}
+                    }
                 }
             }
         };
@@ -380,10 +420,17 @@ const CallWindow = ({ activeCall, chatSocket, currentUserId, onClose }) => {
                     await peerObj.pc.addIceCandidate(new RTCIceCandidate(candidate));
                 }
             } else {
-                if (senderId !== targetTargetId) return;
+                if (String(senderId) !== String(targetTargetId)) return;
                 const pc = peerConnectionRef.current;
-                if (pc && pc.remoteDescription) {
-                    await pc.addIceCandidate(new RTCIceCandidate(candidate));
+                if (pc && pc.remoteDescription && pc.remoteDescription.type) {
+                    try {
+                        await pc.addIceCandidate(new RTCIceCandidate(candidate));
+                    } catch (err) {
+                        console.warn("⚠️ Lỗi thêm ICE candidate:", err.message);
+                    }
+                } else {
+                    console.log("⏳ [WEBRTC 1-1] Lưu ICE candidate vào bộ đệm pending");
+                    pendingCandidatesRef.current.push(candidate);
                 }
             }
         };
