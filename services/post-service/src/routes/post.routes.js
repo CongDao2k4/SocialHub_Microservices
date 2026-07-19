@@ -41,8 +41,8 @@ router.post('/posts/:id/share', ShareController.sharePost);
 
 // Reels
 router.post('/reels', ReelController.createReel);
-router.get('/reels', ReelController.getReelsFeed);
-router.post('/reels/:id/view', ReelController.incrementViewCount);
+router.get('/reels', ReelController.getReels);
+router.post('/reels/:id/view', ReelController.incrementReelView);
 router.get('/reels/user/:userId', ReelController.getUserReels);
 
 // Reels Likes & Comments (Re-use post interactions directly)
