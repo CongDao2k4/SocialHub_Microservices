@@ -186,8 +186,10 @@ export const SocketProvider = ({ children }) => {
         setActiveCall({
             targetUser: {
                 id: incomingCall.callerId,
-                displayName: incomingCall.callerName,
-                avatarUrl: incomingCall.callerAvatar
+                displayName: incomingCall.isGroup ? (incomingCall.groupName || "Cuộc gọi nhóm") : incomingCall.callerName,
+                avatarUrl: incomingCall.isGroup ? incomingCall.groupAvatar : incomingCall.callerAvatar,
+                isGroup: incomingCall.isGroup || false,
+                groupId: incomingCall.groupId || null
             },
             callType: incomingCall.callType,
             isCaller: false
@@ -208,13 +210,13 @@ export const SocketProvider = ({ children }) => {
         setIncomingCall(null);
     };
 
-    // Hàm khởi tạo cuộc gọi từ Client
+    // Hàm khởi tạo cuộc gọi từ Client (Hỗ trợ 1-1 và Gọi Nhóm)
     const initiateCall = (targetUser, callType = "video") => {
         if (!targetUser || !chatSocket) return;
 
-        const targetId = targetUser.id || targetUser.userId;
-        if (!targetId) {
-            console.error("❌ Không thể khởi tạo cuộc gọi: targetUserId không hợp lệ", targetUser);
+        const targetId = targetUser.id || targetUser.userId || targetUser.groupId;
+        if (!targetId && (!targetUser.targetUserIds || targetUser.targetUserIds.length === 0)) {
+            console.error("❌ Không thể khởi tạo cuộc gọi: targetUserId/targetUserIds không hợp lệ", targetUser);
             return;
         }
 
@@ -222,7 +224,10 @@ export const SocketProvider = ({ children }) => {
             id: targetId,
             userId: targetId,
             displayName: targetUser.displayName || "Người dùng",
-            avatarUrl: targetUser.avatarUrl || null
+            avatarUrl: targetUser.avatarUrl || null,
+            isGroup: targetUser.isGroup || false,
+            groupId: targetUser.groupId || null,
+            targetUserIds: targetUser.targetUserIds || null
         };
 
         setActiveCall({

@@ -190,12 +190,22 @@ const CallWindow = ({ activeCall, chatSocket, currentUserId, onClose }) => {
                 // Đánh dấu media cục bộ đã chuẩn bị xong
                 isMediaReadyRef.current = true;
 
-                // NẾU LÀ NGƯỜI GỌI (Caller): Bắt đầu phát cuộc gọi sang Server
+                // NẾU LÀ NGƯỜI GỌI (Caller): Bắt đầu phát cuộc gọi sang Server (Hỗ trợ 1-1 và Nhóm)
                 if (isCaller) {
-                    chatSocket.emit("call:initiate", {
-                        targetUserId: targetTargetId,
-                        callType
-                    });
+                    if (targetUser?.isGroup && targetUser?.targetUserIds) {
+                        chatSocket.emit("call:initiate", {
+                            groupId: targetUser.groupId,
+                            targetUserIds: targetUser.targetUserIds,
+                            groupName: targetUser.displayName,
+                            groupAvatar: targetUser.avatarUrl,
+                            callType
+                        });
+                    } else {
+                        chatSocket.emit("call:initiate", {
+                            targetUserId: targetTargetId,
+                            callType
+                        });
+                    }
                 } else if (offerSdp || pendingOfferRef.current) {
                     // Nếu là Callee và đã nhận Offer trước đó
                     const offerToProcess = offerSdp || pendingOfferRef.current;

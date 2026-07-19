@@ -8,18 +8,52 @@ import { redisClient } from '../config/redis.js';
 export default (io, socket) => {
   const currentUserId = socket.userId;
 
-  // 1. Initiating a Call
+  // 1. Initiating a Call (1-on-1 or Group)
   socket.on('call:initiate', async (payload) => {
     try {
-      const { targetUserId, callerName, callerAvatar, callType = 'video' } = payload;
+      const { targetUserId, targetUserIds, groupId, groupName, groupAvatar, callerName, callerAvatar, callType = 'video' } = payload;
 
+      // Xử lý cuộc gọi nhóm (Group Call)
+      if (targetUserIds && Array.isArray(targetUserIds) && targetUserIds.length > 0) {
+        console.log(`📞 [CALL] User ${currentUserId} (${socket.displayName}) initiating group ${callType} call for group "${groupName || groupId}" to members:`, targetUserIds);
+
+        let onlineCount = 0;
+        for (const memberId of targetUserIds) {
+          if (String(memberId) === String(currentUserId)) continue;
+
+          const memberSockets = await io.in(`user:${memberId}`).fetchSockets();
+          if (memberSockets.length > 0) {
+            onlineCount++;
+            io.to(`user:${memberId}`).emit('call:incoming', {
+              callerId: currentUserId,
+              callerName: callerName || socket.displayName,
+              callerAvatar: callerAvatar || socket.avatarUrl,
+              callType,
+              groupId,
+              groupName,
+              groupAvatar,
+              isGroup: true
+            });
+          }
+        }
+
+        if (onlineCount === 0) {
+          console.log(`⚠️ [CALL] No online members found for group call ${groupId || ''}`);
+          return socket.emit('call:rejected', {
+            groupId,
+            reason: 'all_offline'
+          });
+        }
+        return;
+      }
+
+      // Xử lý cuộc gọi 1-1 (1-on-1 Call)
       if (!targetUserId) {
-        return socket.emit('error', { message: 'targetUserId is required' });
+        return socket.emit('error', { message: 'targetUserId or targetUserIds is required' });
       }
 
       console.log(`📞 [CALL] User ${currentUserId} (${socket.displayName}) initiating ${callType} call to ${targetUserId}`);
 
-      // Check if target user has active sockets in the personal room across the cluster
       const targetSockets = await io.in(`user:${targetUserId}`).fetchSockets();
       const isOnline = targetSockets.length > 0;
 
@@ -31,7 +65,6 @@ export default (io, socket) => {
         });
       }
 
-      // Forward call:incoming to target user's personal socket room
       io.to(`user:${targetUserId}`).emit('call:incoming', {
         callerId: currentUserId,
         callerName: callerName || socket.displayName,

@@ -41,6 +41,12 @@ const IncomingCallModal = ({ incomingCall, onAccept, onReject }) => {
         };
     }, []);
 
+    const displayAvatar = isGroup ? (groupAvatar || callerAvatar) : callerAvatar;
+    const displayName = isGroup ? (groupName || "Cuộc gọi nhóm") : callerName;
+    const subtitleText = isGroup 
+        ? `${callerName} đang gọi ${callType === 'video' ? 'Video' : 'thoại'} nhóm...` 
+        : (callType === 'video' ? 'Cuộc gọi Video đến...' : 'Cuộc gọi thoại đến...');
+
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 backdrop-blur-md animate-fadeIn p-4">
             <div className="bg-slate-900 border border-slate-800 rounded-3xl p-8 w-full max-w-sm flex flex-col items-center text-center space-y-6 shadow-2xl relative overflow-hidden">
@@ -51,8 +57,8 @@ const IncomingCallModal = ({ incomingCall, onAccept, onReject }) => {
                 <div className="relative">
                     <div className="absolute inset-0 rounded-full bg-blue-500/30 animate-ping" />
                     <img
-                        src={callerAvatar || "https://api.dicebear.com/7.x/adventurer/svg?seed=Felix"}
-                        alt={callerName}
+                        src={displayAvatar || "https://api.dicebear.com/7.x/adventurer/svg?seed=Felix"}
+                        alt={displayName}
                         className="w-24 h-24 rounded-full object-cover border-4 border-slate-700 relative z-10 shadow-lg"
                     />
                     <div className="absolute bottom-0 right-0 z-20 bg-blue-600 p-2 rounded-full text-white border-2 border-slate-900 shadow">
@@ -61,9 +67,9 @@ const IncomingCallModal = ({ incomingCall, onAccept, onReject }) => {
                 </div>
 
                 <div>
-                    <h3 className="text-xl font-bold text-white tracking-tight">{callerName}</h3>
+                    <h3 className="text-xl font-bold text-white tracking-tight">{displayName}</h3>
                     <p className="text-sm text-slate-400 mt-1">
-                        {callType === 'video' ? 'Cuộc gọi Video đến...' : 'Cuộc gọi thoại đến...'}
+                        {subtitleText}
                     </p>
                 </div>
 

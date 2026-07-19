@@ -366,32 +366,46 @@ const ChatBox = ({ conversation, onClose, currentUserId }) => {
                 </div>
                 
                 <div className="flex items-center space-x-1">
-                    {!isGroup && (
-                        <>
-                            <button
-                                onClick={() => initiateCall({
-                                    id: otherParticipant.userId,
-                                    displayName: otherParticipant.displayName,
-                                    avatarUrl: otherParticipant.avatarUrl
-                                }, "audio")}
-                                title="Gọi thoại"
-                                className="p-1.5 hover:bg-slate-100 rounded-full text-slate-500 hover:text-emerald-600 transition cursor-pointer"
-                            >
-                                <Phone className="w-4 h-4" />
-                            </button>
-                            <button
-                                onClick={() => initiateCall({
-                                    id: otherParticipant.userId,
-                                    displayName: otherParticipant.displayName,
-                                    avatarUrl: otherParticipant.avatarUrl
-                                }, "video")}
-                                title="Gọi Video"
-                                className="p-1.5 hover:bg-slate-100 rounded-full text-slate-500 hover:text-blue-600 transition cursor-pointer"
-                            >
-                                <Video className="w-4 h-4" />
-                            </button>
-                        </>
-                    )}
+                    <button
+                        onClick={() => initiateCall(
+                            isGroup ? {
+                                id: conversation.groupRef?._id || conversationId,
+                                displayName: chatTitle,
+                                avatarUrl: chatAvatar,
+                                isGroup: true,
+                                groupId: conversation.groupRef?._id || conversationId,
+                                targetUserIds: conversation.participants?.map(p => p.userId).filter(id => String(id) !== String(currentUserId)) || []
+                            } : {
+                                id: otherParticipant.userId,
+                                displayName: otherParticipant.displayName,
+                                avatarUrl: otherParticipant.avatarUrl
+                            }, "audio"
+                        )}
+                        title={isGroup ? "Gọi thoại nhóm" : "Gọi thoại"}
+                        className="p-1.5 hover:bg-slate-100 rounded-full text-slate-500 hover:text-emerald-600 transition cursor-pointer"
+                    >
+                        <Phone className="w-4 h-4" />
+                    </button>
+                    <button
+                        onClick={() => initiateCall(
+                            isGroup ? {
+                                id: conversation.groupRef?._id || conversationId,
+                                displayName: chatTitle,
+                                avatarUrl: chatAvatar,
+                                isGroup: true,
+                                groupId: conversation.groupRef?._id || conversationId,
+                                targetUserIds: conversation.participants?.map(p => p.userId).filter(id => String(id) !== String(currentUserId)) || []
+                            } : {
+                                id: otherParticipant.userId,
+                                displayName: otherParticipant.displayName,
+                                avatarUrl: otherParticipant.avatarUrl
+                            }, "video"
+                        )}
+                        title={isGroup ? "Gọi Video nhóm" : "Gọi Video"}
+                        className="p-1.5 hover:bg-slate-100 rounded-full text-slate-500 hover:text-blue-600 transition cursor-pointer"
+                    >
+                        <Video className="w-4 h-4" />
+                    </button>
                     <button onClick={onClose} className="p-1.5 hover:bg-slate-100 rounded-full text-slate-500 hover:text-slate-800 transition cursor-pointer">
                         <X className="w-4 h-4" />
                     </button>
