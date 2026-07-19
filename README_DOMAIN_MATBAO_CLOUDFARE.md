@@ -181,6 +181,26 @@ Tìm cột **`EXTERNAL-IP`** của 2 dịch vụ sau:
 > [!NOTE]
 > Bật trạng thái **Proxied** giúp Cloudflare tự động đứng ra làm trung gian SSL (HTTPS), mã hóa lưu lượng từ client đến Cloudflare và định tuyến về GKE mà không cần cấu hình TLS/Let's Encrypt thủ công trên Kubernetes.
 
+> [!IMPORTANT]
+> **CẤU HÌNH BẮT BUỘC ĐỂ TRÁNH LỖI TIMEOUT (ERROR 522) VÀ CHẠY HTTPS:**
+> 1. **Chuyển SSL/TLS Mode sang Flexible**: Do dịch vụ chạy trên GKE mặc định lắng nghe ở cổng HTTP `80` hoặc `8080` (không cài chứng chỉ SSL trực tiếp trên GKE), bạn **bắt buộc** phải cấu hình SSL/TLS Mode trên Cloudflare Dashboard thành **`Flexible`** (thay vì *Full* hoặc *Full strict*). Nếu không, Cloudflare sẽ cố kết nối đến GKE qua cổng 443 và gây lỗi `Connection timed out (Error 522)`.
+> 2. **Định tuyến Port cho Gateway bằng Cloudflare Origin Rules (Giữ Gateway chạy cổng `8080` trên GKE)**:
+>    Vì Gateway chạy ở cổng `8080` trên Kubernetes, nhưng Frontend gọi API qua HTTPS cổng `443` ngầm định (`https://api.socialhubzz.cloud`), hãy cấu hình một **Origin Rule** trên Cloudflare để tự động đổi cổng:
+>    - Vào Cloudflare Dashboard -> Chọn tên miền `socialhubzz.cloud`.
+>    - Tại menu bên trái, tìm và chọn mục **Rules** (hoặc **Rules** -> **Overview**).
+>    - Nhấp vào nút **`+ Create rule`** (màu xanh ở góc trên bên phải).
+>    - Từ menu thả xuống, chọn **`Origin Rule`** (nằm trong nhóm *Modify Cloudflare configurations and behaviors*).
+>    - Đặt tên quy tắc ở phần **Rule name**: ví dụ `Route API to Port 8080`.
+>    - Ở mục **If incoming requests match...** (Nếu request khớp với điều kiện):
+>      - *Field*: Chọn **Hostname**
+>      - *Operator*: Chọn **equals**
+>      - *Value*: Nhập **`api.socialhubzz.cloud`**
+>    - Ở mục **Destination Port** (ở phía dưới cùng):
+>      - Chọn **Rewrite to...** (Thay vì *Preserve*)
+>      - Nhập giá trị: **`8080`**
+>    - Nhấn **Deploy** (Triển khai).
+>    *(Quy tắc này giúp Cloudflare nhận request HTTPS từ client ở cổng mặc định, sau đó tự chuyển tiếp đến cổng `8080` của IP LoadBalancer GKE).*
+
 ### Bước 3: Build và Deploy Frontend lên GKE
 Khi build frontend để đẩy lên GKE thông qua Cloud Build, tệp cấu hình đã được thiết lập mặc định để nhận tên miền HTTPS:
 1. Kiểm tra file `cloudbuild.yaml` đã trỏ đúng tên miền API Gateway của bạn ở phần substitutions:
@@ -195,6 +215,6 @@ Khi build frontend để đẩy lên GKE thông qua Cloud Build, tệp cấu hì
 2. Thực hiện Trigger Cloud Build để đóng gói và triển khai lên cụm GKE.
 
 ### Bước 4: Kiểm tra và Vận hành
-- Truy cập vào: `https://gke.yourdomain.com` (Trình duyệt sẽ hiển thị ổ khóa xanh và cho phép yêu cầu Camera/Mic).
-- Các API request của frontend sẽ gửi tới `https://api.yourdomain.com/api` (Cũng chạy qua HTTPS và hoạt động đồng bộ).
+- Truy cập vào: `https://gke.socialhubzz.cloud` (Trình duyệt sẽ hiển thị ổ khóa xanh và cho phép yêu cầu Camera/Mic).
+- Các API request của frontend sẽ gửi tới `https://api.socialhubzz.cloud/api` (Cũng chạy qua HTTPS và hoạt động đồng bộ).
 - **Mỗi lần khởi chạy lại cụm GKE**: Chỉ cần vào tab DNS của Cloudflare và sửa lại giá trị **IPv4 address** của 2 bản ghi `gke` và `api` thành IP mới là xong. Hệ thống sẽ hoạt động ngay lập tức sau 1 phút mà không cần redeploy code.

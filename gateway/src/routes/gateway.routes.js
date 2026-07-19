@@ -37,6 +37,7 @@ const mapToPostService = (req, res) => {
 // Map all under /posts and /feed to post-service
 router.use('/posts', protectRoute, mapToPostService);
 router.use('/feed', protectRoute, mapToPostService);
+router.use('/reels', protectRoute, mapToPostService);
 
 // --- friend-service routes ---
 const mapToFriendService = (req, res) => {
