@@ -39,16 +39,4 @@ router.delete('/posts/:postId/comments/:commentId', CommentController.deleteComm
 // Share
 router.post('/posts/:id/share', ShareController.sharePost);
 
-// Reels
-router.post('/reels', ReelController.createReel);
-router.get('/reels', ReelController.getReels);
-router.post('/reels/:id/view', ReelController.incrementReelView);
-router.get('/reels/user/:userId', ReelController.getUserReels);
-
-// Reels Likes & Comments (Re-use post interactions directly)
-router.post('/reels/:id/like', LikeController.likePost);
-router.delete('/reels/:id/like', LikeController.unlikePost);
-router.get('/reels/:id/comments', CommentController.getPostComments);
-router.post('/reels/:id/comments', CommentController.createComment);
-
 export default router;
