@@ -11,71 +11,28 @@ import {
   Loader, 
   Send, 
   X,
+  Play,
+  Pause,
   MessageSquareCode
 } from "lucide-react";
 import CreateReelModal from "../components/CreateReelModal";
 import ShareModal from "../components/ShareModal";
+import HlsVideoPlayer from "../components/HlsVideoPlayer";
+
+const formatTime = (seconds) => {
+  if (!seconds || isNaN(seconds)) return "0:00";
+  const mins = Math.floor(seconds / 60);
+  const secs = Math.floor(seconds % 60);
+  return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+};
 
 // Component con hiển thị từng Video Reel đơn lẻ
 const ReelItem = ({ reel, isActive, isMuted, toggleMute, onLikeToggle, onOpenComments, onShare }) => {
   const videoRef = useRef(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [showHeartAnimation, setShowHeartAnimation] = useState(false);
-  const [videoSrc, setVideoSrc] = useState("");
-  const [isLoadingVideo, setIsLoadingVideo] = useState(false);
-  const { user } = useAuth();
-
-  // Tải video dạng blob qua API để tự động đính kèm JWT Token và bypass headers
-  useEffect(() => {
-    const videoId = reel.media_ids?.[0];
-    if (!videoId) return;
-
-    let objectUrl = "";
-    setIsLoadingVideo(true);
-
-    const fetchVideoBlob = async () => {
-      try {
-        const res = await api.get(`/media/file/${videoId}`, { responseType: "blob" });
-        objectUrl = URL.createObjectURL(res.data);
-        setVideoSrc(objectUrl);
-      } catch (err) {
-        console.error(`❌ Lỗi tải video Reel ${videoId}:`, err.message);
-      } finally {
-        setIsLoadingVideo(false);
-      }
-    };
-
-    fetchVideoBlob();
-
-    return () => {
-      if (objectUrl) {
-        URL.revokeObjectURL(objectUrl);
-      }
-    };
-  }, [reel.media_ids]);
-
-  // Tự động Play/Pause dựa trên active state từ IntersectionObserver
-  useEffect(() => {
-    if (!videoRef.current || !videoSrc) return;
-
-    if (isActive) {
-      // Khi active, thử phát video
-      videoRef.current.play()
-        .then(() => {
-          setIsPlaying(true);
-          // Tăng lượt xem video qua API
-          api.post(`/reels/${reel.id}/view`).catch(() => {});
-        })
-        .catch(err => {
-          console.log("❌ Trình duyệt chặn autoplay:", err.message);
-          setIsPlaying(false);
-        });
-    } else {
-      videoRef.current.pause();
-      videoRef.current.currentTime = 0;
-      setIsPlaying(false);
-    }
-  }, [isActive, videoSrc, reel.id]);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
 
   // Click vào video để Play/Pause thủ công
   const handleVideoClick = () => {
@@ -90,6 +47,19 @@ const ReelItem = ({ reel, isActive, isMuted, toggleMute, onLikeToggle, onOpenCom
     }
   };
 
+  // Tua video khi click/kéo trên thanh progress bar
+  const handleSeek = (e) => {
+    e.stopPropagation();
+    if (!videoRef.current || !duration) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    const clickX = e.clientX - rect.left;
+    const width = rect.width;
+    const targetRatio = Math.max(0, Math.min(1, clickX / width));
+    const newTime = targetRatio * duration;
+    videoRef.current.currentTime = newTime;
+    setCurrentTime(newTime);
+  };
+
   // Double Click để Thả tim nhanh giống Instagram
   const handleDoubleClick = () => {
     setShowHeartAnimation(true);
@@ -101,22 +71,28 @@ const ReelItem = ({ reel, isActive, isMuted, toggleMute, onLikeToggle, onOpenCom
 
   return (
     <div className="w-full h-full snap-start flex justify-center items-center bg-slate-950 relative border-b border-white/5 overflow-hidden">
-      {/* Video Phát chính */}
-      {isLoadingVideo ? (
-        <div className="flex-1 flex flex-col justify-center items-center text-slate-400 space-y-3 h-full max-w-[450px] bg-slate-950">
-          <Loader className="w-8 h-8 text-violet-500 animate-spin" />
-          <p className="text-[10px]">Đang tải video...</p>
-        </div>
-      ) : videoSrc ? (
-        <video
-          ref={videoRef}
-          src={videoSrc}
-          loop
+      {/* Video Phát chính bằng HLS Streaming */}
+      {reel.media_ids?.[0] ? (
+        <HlsVideoPlayer
+          mediaId={reel.media_ids[0]}
+          isReel={true}
+          isActive={isActive}
           muted={isMuted}
-          playsInline
+          controls={false}
+          videoRefProp={videoRef}
+          className="w-full h-full object-cover max-w-[450px] cursor-pointer"
           onClick={handleVideoClick}
-          onDoubleClick={handleDoubleClick}
-          className="w-full h-full object-cover max-w-[450px]"
+          onTimeUpdate={() => {
+            if (videoRef.current) setCurrentTime(videoRef.current.currentTime);
+          }}
+          onLoadedMetadata={() => {
+            if (videoRef.current) setDuration(videoRef.current.duration);
+          }}
+          onPlaySuccess={() => {
+            setIsPlaying(true);
+            api.post(`/reels/${reel.id}/view`).catch(() => {});
+          }}
+          onPlayError={() => setIsPlaying(false)}
         />
       ) : (
         <div className="text-slate-500 text-xs italic">Không tải được tệp video</div>
@@ -129,11 +105,11 @@ const ReelItem = ({ reel, isActive, isMuted, toggleMute, onLikeToggle, onOpenCom
         </div>
       )}
 
-      {/* Chỉ báo trạng thái Tạm dừng (Pause Icon Overlay) */}
-      {!isPlaying && videoSrc && (
-        <div className="absolute inset-0 flex items-center justify-center pointer-events-none bg-black/10">
-          <div className="w-16 h-16 rounded-full bg-black/40 backdrop-blur-sm flex items-center justify-center text-white/80 scale-95 opacity-0 animate-fadeIn">
-            ▶
+      {/* Nút Play hiển thị chính giữa khi tạm dừng video */}
+      {!isPlaying && (
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
+          <div className="w-16 h-16 rounded-full bg-black/50 backdrop-blur-md flex items-center justify-center text-white border border-white/20 shadow-2xl scale-100 transition duration-200">
+            <Play className="w-7 h-7 fill-white ml-1" />
           </div>
         </div>
       )}
@@ -141,13 +117,13 @@ const ReelItem = ({ reel, isActive, isMuted, toggleMute, onLikeToggle, onOpenCom
       {/* Nút bật/tắt tiếng âm thanh */}
       <button
         onClick={toggleMute}
-        className="absolute top-4 right-4 p-2.5 rounded-full bg-black/40 backdrop-blur-sm hover:bg-black/60 border border-white/10 text-white cursor-pointer z-10 transition duration-150"
+        className="absolute top-4 right-4 p-2.5 rounded-full bg-black/40 backdrop-blur-sm hover:bg-black/60 border border-white/10 text-white cursor-pointer z-30 transition duration-150"
       >
         {isMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
       </button>
 
       {/* Phần thông tin tác giả và mô tả ở góc dưới bên trái */}
-      <div className="absolute bottom-4 left-4 right-16 text-left space-y-2 z-10 max-w-[80%] pointer-events-auto">
+      <div className="absolute bottom-6 left-4 right-16 text-left space-y-2 z-30 max-w-[80%] pointer-events-auto">
         <div className="flex items-center space-x-2.5">
           <img
             src={reel.author?.avatarUrl || `https://api.dicebear.com/7.x/adventurer/svg?seed=${reel.author_id}`}
@@ -166,8 +142,8 @@ const ReelItem = ({ reel, isActive, isMuted, toggleMute, onLikeToggle, onOpenCom
         )}
       </div>
 
-      {/* Cột các nút tương tác bên phải */}
-      <div className="absolute bottom-4 right-3 flex flex-col items-center space-y-5 z-10 pointer-events-auto">
+      {/* Cột các nút tương tác bên phải (Like, Comment, Share) */}
+      <div className="absolute bottom-6 right-3 flex flex-col items-center space-y-5 z-30 pointer-events-auto">
         {/* Nút Like (Heart) */}
         <div className="flex flex-col items-center text-center space-y-1">
           <button
@@ -203,6 +179,27 @@ const ReelItem = ({ reel, isActive, isMuted, toggleMute, onLikeToggle, onOpenCom
             <Share2 className="w-5 h-5" />
           </button>
           <span className="text-[10px] font-bold text-white drop-shadow-md">{reel.share_count || 0}</span>
+        </div>
+      </div>
+
+      {/* Thanh Scrubber / Tua video chuẩn Facebook Reels ở đáy */}
+      <div className="absolute bottom-0 left-0 right-0 z-20 px-3 pb-1 pt-3 bg-gradient-to-t from-black/90 via-black/40 to-transparent flex flex-col space-y-1 pointer-events-auto">
+        <div 
+          className="relative w-full h-1.5 hover:h-2.5 bg-white/20 hover:bg-white/30 rounded-full cursor-pointer transition-all duration-150 group"
+          onClick={handleSeek}
+        >
+          {/* Thanh tiến trình đã phát */}
+          <div 
+            className="h-full bg-violet-500 rounded-full relative group-hover:bg-violet-400"
+            style={{ width: `${duration ? (currentTime / duration) * 100 : 0}%` }}
+          >
+            {/* Núm tròn chỉ báo khi hover */}
+            <div className="absolute right-0 top-1/2 -translate-y-1/2 w-3 h-3 bg-white rounded-full shadow opacity-0 group-hover:opacity-100 transition-opacity" />
+          </div>
+        </div>
+        <div className="flex justify-between items-center text-[10px] text-white/70 font-mono px-0.5 pointer-events-none">
+          <span>{formatTime(currentTime)}</span>
+          <span>{formatTime(duration)}</span>
         </div>
       </div>
 
@@ -415,44 +412,48 @@ const Reels = () => {
   return (
     <div className="w-full flex items-center justify-center min-h-[calc(100vh-8.5rem)] md:min-h-[calc(100vh-6rem)] relative bg-slate-900 md:rounded-3xl overflow-hidden shadow-2xl py-0 md:py-3 border-0 md:border border-white/5 select-none">
       
-      {/* Khung chứa các Video cuộn dọc */}
-      <div 
-        ref={containerRef}
-        className="w-full md:max-w-[420px] h-[calc(100vh-8.5rem)] md:h-[78vh] snap-y snap-mandatory overflow-y-scroll scrollbar-none md:rounded-2xl border-0 md:border border-white/10 shadow-2xl relative bg-slate-950 flex flex-col"
-      >
-        {isLoading && reels.length === 0 ? (
-          <div className="flex-1 flex flex-col justify-center items-center text-slate-400 space-y-3">
-            <Loader className="w-8 h-8 text-violet-500 animate-spin" />
-            <p className="text-xs">Đang chuẩn bị thước phim...</p>
-          </div>
-        ) : reels.length > 0 ? (
-          reels.map((reel, index) => (
-            <div 
-              key={reel.id} 
-              data-index={index} 
-              className="w-full h-full shrink-0 snap-start"
-            >
-              <ReelItem
-                reel={reel}
-                isActive={index === activeReelIndex}
-                isMuted={isMuted}
-                toggleMute={() => setIsMuted(prev => !prev)}
-                onLikeToggle={handleLikeToggle}
-                onOpenComments={handleOpenComments}
-                onShare={handleShareClick}
-              />
+      {/* Frame bọc ngoài cố định không cuộn */}
+      <div className="w-full md:max-w-[420px] h-[calc(100vh-8.5rem)] md:h-[78vh] md:rounded-2xl border-0 md:border border-white/10 shadow-2xl relative bg-slate-950 flex flex-col overflow-hidden">
+        
+        {/* Khung chứa các Video cuộn dọc */}
+        <div 
+          ref={containerRef}
+          className="w-full h-full snap-y snap-mandatory overflow-y-scroll scrollbar-none flex flex-col"
+        >
+          {isLoading && reels.length === 0 ? (
+            <div className="flex-1 flex flex-col justify-center items-center text-slate-400 space-y-3">
+              <Loader className="w-8 h-8 text-violet-500 animate-spin" />
+              <p className="text-xs">Đang chuẩn bị thước phim...</p>
             </div>
-          ))
-        ) : (
-          <div className="flex-1 flex flex-col justify-center items-center text-slate-500 text-xs italic space-y-4 p-8 text-center">
-            <p>Chưa có Reels nào được đăng tải.</p>
-            <p>Hãy trở thành người đầu tiên chia sẻ thước phim ngắn của bạn!</p>
-          </div>
-        )}
+          ) : reels.length > 0 ? (
+            reels.map((reel, index) => (
+              <div 
+                key={reel.id} 
+                data-index={index} 
+                className="w-full h-full shrink-0 snap-start"
+              >
+                <ReelItem
+                  reel={reel}
+                  isActive={index === activeReelIndex}
+                  isMuted={isMuted}
+                  toggleMute={() => setIsMuted(prev => !prev)}
+                  onLikeToggle={handleLikeToggle}
+                  onOpenComments={handleOpenComments}
+                  onShare={handleShareClick}
+                />
+              </div>
+            ))
+          ) : (
+            <div className="flex-1 flex flex-col justify-center items-center text-slate-500 text-xs italic space-y-4 p-8 text-center">
+              <p>Chưa có Reels nào được đăng tải.</p>
+              <p>Hãy trở thành người đầu tiên chia sẻ thước phim ngắn của bạn!</p>
+            </div>
+          )}
+        </div>
 
-        {/* Ngăn kéo Bình luận (Comment Drawer) trượt lên từ dưới */}
+        {/* Ngăn kéo Bình luận (Comment Drawer) trượt lên trên khung cố định, nằm ngoài scroll container */}
         {commentDrawerOpen && selectedCommentReel && (
-          <div className="absolute inset-x-0 bottom-0 h-[60%] bg-slate-900/95 backdrop-blur-md rounded-t-2xl z-20 flex flex-col border-t border-white/10 shadow-2xl animate-slideUp">
+          <div className="absolute inset-x-0 bottom-0 h-[65%] bg-slate-900/95 backdrop-blur-md rounded-t-2xl z-50 flex flex-col border-t border-white/10 shadow-2xl animate-slideUp">
             
             {/* Header Drawer */}
             <div className="flex justify-between items-center px-4 py-3 border-b border-white/10">

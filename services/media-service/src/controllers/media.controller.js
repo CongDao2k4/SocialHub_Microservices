@@ -78,5 +78,31 @@ export const mediaController = {
     } catch (err) {
       res.status(503).json({ status: 'error', message: 'MinIO unreachable' });
     }
+  },
+
+  getHlsMasterPlaylist: async (req, res, next) => {
+    try {
+      const { id } = req.params;
+      const { stream, mimeType } = await mediaService.getHlsMasterPlaylist(id);
+      
+      res.setHeader('Content-Type', mimeType);
+      res.setHeader('Cache-Control', 'no-cache');
+      stream.pipe(res);
+    } catch (err) {
+      next(err);
+    }
+  },
+
+  getHlsSegment: async (req, res, next) => {
+    try {
+      const { id, segment } = req.params;
+      const { stream, mimeType } = await mediaService.getHlsSegment(id, segment);
+      
+      res.setHeader('Content-Type', mimeType);
+      res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+      stream.pipe(res);
+    } catch (err) {
+      next(err);
+    }
   }
 };

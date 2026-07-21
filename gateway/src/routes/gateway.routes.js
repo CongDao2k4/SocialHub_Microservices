@@ -24,6 +24,8 @@ const mapToMediaService = (req, res) => {
 router.post('/media/upload', protectRoute, mapToMediaService);
 router.post('/media/batch-urls', protectRoute, mapToMediaService);
 router.get('/media/file/:id', mapToMediaService); // Public streaming route
+router.get('/media/hls/:id/index.m3u8', mapToMediaService); // Public HLS master playlist
+router.get('/media/hls/:id/:segment', mapToMediaService); // Public HLS segment stream
 router.get('/media/:id', protectRoute, mapToMediaService);
 router.get('/media/:id/url', protectRoute, mapToMediaService);
 router.delete('/media/:id', protectRoute, mapToMediaService);

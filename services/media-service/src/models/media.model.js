@@ -11,6 +11,8 @@ const mediaSchema = new mongoose.Schema(
     compressedSize: { type: Number },
     compressionRatio: { type: Number },
     format: { type: String, default: null },
+    hlsReady: { type: Boolean, default: false },
+    hlsMasterKey: { type: String, default: null },
     variants: {
       type: Map,
       of: String,

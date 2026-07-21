@@ -5,6 +5,7 @@ import { Heart, MessageSquare, Share2, Trash2, Send, Loader, Edit3 } from "lucid
 import ShareModal from "./ShareModal";
 import EditPostModal from "./EditPostModal";
 import ImageLightboxModal from "./ImageLightboxModal";
+import HlsVideoPlayer from "./HlsVideoPlayer";
 import { useAuth } from "../context/AuthContext"; // <-- Import useAuth
 
 const PostCard = ({ post, currentUserId, onPostShared, onPostDeleted, onPostUpdated }) => {
@@ -137,40 +138,47 @@ const PostCard = ({ post, currentUserId, onPostShared, onPostDeleted, onPostUpda
 
     // 1. Tải tất cả Media (Ảnh & Video) đính kèm của bài viết
     useEffect(() => {
-        let createdObjectUrls = [];
-        const mediaList = post.media_ids || post.mediaIds || [];
-        const fetchAllMedia = async () => {
-            if (mediaList && mediaList.length > 0) {
-                setIsLoadingMedia(true);
-                try {
-                    const promises = mediaList.map(async (mId) => {
-                        try {
-                            const res = await api.get(`/media/file/${mId}?variant=medium`, { responseType: "blob" });
-                            const objUrl = URL.createObjectURL(res.data);
-                            createdObjectUrls.push(objUrl);
-                            const type = res.data.type || "";
-                            return { id: mId, url: objUrl, isVideo: type.startsWith("video/") };
-                        } catch (err) {
-                            console.error(`❌ Lỗi lấy media ${mId}:`, err.message);
-                            return null;
-                        }
-                    });
-                    const results = await Promise.all(promises);
+        const rawMediaList = post.media_ids || post.mediaIds || [];
+        if (!rawMediaList || rawMediaList.length === 0) {
+            setMediaItems([]);
+            setIsLoadingMedia(false);
+            return;
+        }
+
+        let isSubscribed = true;
+        setIsLoadingMedia(true);
+
+        const fetchMediaMeta = async () => {
+            try {
+                const promises = rawMediaList.map(async (item) => {
+                    const mId = typeof item === "string" ? item : (item.id || item._id);
+                    try {
+                        const metaRes = await api.get(`/media/${mId}`);
+                        const mimeType = metaRes.data?.mimeType || "";
+                        const isVideo = mimeType.startsWith("video/");
+                        const imgUrl = `${api.defaults.baseURL}/media/file/${mId}?variant=medium`;
+                        return { id: mId, url: imgUrl, isVideo };
+                    } catch (err) {
+                        return { id: mId, url: `${api.defaults.baseURL}/media/file/${mId}?variant=medium`, isVideo: true };
+                    }
+                });
+                const results = await Promise.all(promises);
+                if (isSubscribed) {
                     setMediaItems(results.filter(Boolean));
-                } catch (error) {
-                    console.error("❌ Lỗi lấy danh sách media:", error.message);
-                } finally {
+                }
+            } catch (error) {
+                console.error("❌ Lỗi phân loại media:", error.message);
+            } finally {
+                if (isSubscribed) {
                     setIsLoadingMedia(false);
                 }
-            } else {
-                setMediaItems([]);
-                setIsLoadingMedia(false);
             }
         };
-        fetchAllMedia();
+
+        fetchMediaMeta();
 
         return () => {
-            createdObjectUrls.forEach((url) => URL.revokeObjectURL(url));
+            isSubscribed = false;
         };
     }, [JSON.stringify(post.media_ids || post.mediaIds || [])]);
 
@@ -209,11 +217,18 @@ const PostCard = ({ post, currentUserId, onPostShared, onPostDeleted, onPostUpda
                 try {
                     const promises = originalMediaList.map(async (mId) => {
                         try {
-                            const res = await api.get(`/media/file/${mId}?variant=medium`, { responseType: "blob" });
-                            const objUrl = URL.createObjectURL(res.data);
-                            createdObjectUrls.push(objUrl);
-                            const type = res.data.type || "";
-                            return { id: mId, url: objUrl, isVideo: type.startsWith("video/") };
+                            const metaRes = await api.get(`/media/${mId}`);
+                            const mimeType = metaRes.data?.mimeType || "";
+                            const isVideo = mimeType.startsWith("video/");
+
+                            if (isVideo) {
+                                return { id: mId, url: "", isVideo: true };
+                            } else {
+                                const res = await api.get(`/media/file/${mId}?variant=medium`, { responseType: "blob" });
+                                const objUrl = URL.createObjectURL(res.data);
+                                createdObjectUrls.push(objUrl);
+                                return { id: mId, url: objUrl, isVideo: false };
+                            }
                         } catch (err) {
                             return null;
                         }
@@ -221,7 +236,7 @@ const PostCard = ({ post, currentUserId, onPostShared, onPostDeleted, onPostUpda
                     const results = await Promise.all(promises);
                     setOriginalMediaItems(results.filter(Boolean));
                 } catch (error) {
-                    console.error("❌ Lỗi lấy media bài viết gốc:", error.message);
+                    console.error("❌ Lỗi lấy media bài gốc:", error.message);
                 } finally {
                     setIsLoadingOriginalMedia(false);
                 }
@@ -235,7 +250,7 @@ const PostCard = ({ post, currentUserId, onPostShared, onPostDeleted, onPostUpda
         return () => {
             createdObjectUrls.forEach((url) => URL.revokeObjectURL(url));
         };
-    }, [JSON.stringify(originalPost ? (originalPost.media_ids || originalPost.mediaIds || []) : [])]);
+    }, [originalPost]);
 
     // 3. Tải danh sách bình luận khi mở khung accordion
     useEffect(() => {
@@ -415,7 +430,7 @@ const PostCard = ({ post, currentUserId, onPostShared, onPostDeleted, onPostUpda
                     {mediaItems.map((item, idx) => (
                         <div key={item.id} className="relative overflow-hidden flex items-center justify-center bg-black/5 rounded-xl">
                             {item.isVideo ? (
-                                <video src={item.url} controls className="w-full max-h-[450px] object-cover rounded-xl" />
+                                <HlsVideoPlayer mediaId={item.id} controls autoPlay={false} className="w-full max-h-[450px] object-cover rounded-xl" />
                             ) : (
                                 <img
                                     src={item.url}
@@ -469,7 +484,7 @@ const PostCard = ({ post, currentUserId, onPostShared, onPostDeleted, onPostUpda
                                     {originalMediaItems.map((item, idx) => (
                                         <div key={item.id} className="relative overflow-hidden flex items-center justify-center bg-black/5 rounded-lg max-h-48">
                                             {item.isVideo ? (
-                                                <video src={item.url} controls className="w-full max-h-48 object-cover rounded-lg" />
+                                                <HlsVideoPlayer mediaId={item.id} controls autoPlay={false} className="w-full max-h-48 object-cover rounded-lg" />
                                             ) : (
                                                 <img
                                                     src={item.url}

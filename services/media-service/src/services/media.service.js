@@ -1,6 +1,7 @@
 import { v4 as uuidv4 } from 'uuid';
 import { minioService } from './minio.service.js';
 import { imageProcessingService } from './image-processing.service.js';
+import { hlsService } from './hls.service.js';
 import { Media } from '../models/media.model.js';
 import { config } from '../config/index.js';
 import { BadRequestError, NotFoundError, ForbiddenError } from '../utils/error.js';
@@ -58,13 +59,21 @@ export const mediaService = {
       variants,
     });
 
+    if (isVideo) {
+      // Kích hoạt tiến trình cắt HLS ngầm
+      hlsService.processVideoToHLS(media._id.toString(), file.buffer, userId, ext).catch(err => {
+        console.error(`❌ Background HLS transcode failed for ${media._id}:`, err.message);
+      });
+    }
+
     return {
       id: media._id.toString(),
       originalName: media.originalName,
       mimeType: media.mimeType,
       size: media.size,
       uploadedBy: media.uploadedBy,
-      createdAt: media.createdAt
+      createdAt: media.createdAt,
+      hlsReady: media.hlsReady
     };
   },
 
@@ -165,5 +174,46 @@ export const mediaService = {
   
   checkHealth: async () => {
     await minioService.checkHealth();
+  },
+
+  getHlsMasterPlaylist: async (id) => {
+    const media = await Media.findById(id);
+    if (!media) throw new NotFoundError('Media not found');
+
+    if (!media.hlsReady || !media.hlsMasterKey) {
+      // Kích hoạt tự động tạo HLS ngầm cho video cũ chưa có HLS (nếu tiến trình chưa chạy)
+      if (media.mimeType && media.mimeType.startsWith('video/') && !hlsService.isProcessing(media._id.toString())) {
+        minioService.getFileStream(media.objectKey).then(async (stream) => {
+          const chunks = [];
+          for await (const chunk of stream) {
+            chunks.push(chunk);
+          }
+          const fileBuffer = Buffer.concat(chunks);
+          const ext = media.originalName?.split('.').pop() || 'mp4';
+          await hlsService.processVideoToHLS(media._id.toString(), fileBuffer, media.uploadedBy, ext);
+        }).catch(err => {
+          console.warn(`⚠️ Lỗi tạo HLS ngầm cho video cũ ${id}:`, err.message);
+        });
+      }
+      throw new NotFoundError('HLS playlist not ready yet');
+    }
+
+    const stream = await minioService.getFileStream(media.hlsMasterKey);
+    return {
+      stream,
+      mimeType: 'application/vnd.apple.mpegurl'
+    };
+  },
+
+  getHlsSegment: async (id, segmentName) => {
+    const media = await Media.findById(id);
+    if (!media) throw new NotFoundError('Media not found');
+
+    const segmentKey = `${media.uploadedBy}/hls/${id}/${segmentName}`;
+    const stream = await minioService.getFileStream(segmentKey);
+    return {
+      stream,
+      mimeType: 'video/mp2t'
+    };
   }
 };
