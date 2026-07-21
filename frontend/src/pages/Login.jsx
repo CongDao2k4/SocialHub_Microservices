@@ -34,12 +34,12 @@ const Login = () => {
             <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-cyan-400/5 rounded-full blur-[128px] pointer-events-none"></div>
 
             {/* Hộp đăng nhập Glassmorphism */}
-            <div className="w-full max-w-md bg-white border border-slate-200 rounded-2xl p-8 shadow-xl shadow-slate-200/50 z-10">
-                <div className="text-center mb-8">
+            <div className="w-full max-w-md bg-white border border-slate-200 rounded-2xl p-5 sm:p-8 shadow-xl shadow-slate-200/50 z-10">
+                <div className="text-center mb-6 sm:mb-8">
                     {/* Logo mạng xã hội */}
-                    <img src="/logo.svg" alt="SocialHub Logo" className="w-16 h-16 mx-auto mb-4 object-contain" />
-                    <h2 className="text-3xl font-extrabold text-slate-900 tracking-tight">SocialHub</h2>
-                    <p className="text-slate-500 mt-2 text-sm">Chào mừng bạn quay lại! Đăng nhập để kết nối.</p>
+                    <img src="/logo.svg" alt="SocialHub Logo" className="w-14 h-14 sm:w-16 sm:h-16 mx-auto mb-3 sm:mb-4 object-contain" />
+                    <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">SocialHub</h2>
+                    <p className="text-slate-500 mt-1 sm:mt-2 text-xs sm:text-sm">Chào mừng bạn quay lại! Đăng nhập để kết nối.</p>
                 </div>
 
                 {error && (
@@ -48,10 +48,10 @@ const Login = () => {
                     </div>
                 )}
 
-                <form onSubmit={handleSubmit} className="space-y-6">
+                <form onSubmit={handleSubmit} className="space-y-5 sm:space-y-6">
                     {/* Email Input */}
-                    <div className="space-y-2">
-                        <label className="text-slate-700 text-sm font-medium block">Địa chỉ Email</label>
+                    <div className="space-y-1.5 sm:space-y-2">
+                        <label className="text-slate-700 text-xs sm:text-sm font-medium block">Địa chỉ Email</label>
                         <div className="relative">
                             <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400">
                                 <Mail className="w-5 h-5" />
@@ -62,14 +62,14 @@ const Login = () => {
                                 value={email}
                                 onChange={(e) => setEmail(e.target.value)}
                                 placeholder="name@example.com"
-                                className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-10 pr-4 py-3 text-slate-800 placeholder-slate-400 focus:outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-600 transition duration-200"
+                                className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-10 pr-4 py-2.5 sm:py-3 text-base sm:text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-600 transition duration-200"
                             />
                         </div>
                     </div>
 
                     {/* Mật khẩu Input */}
-                    <div className="space-y-2">
-                        <label className="text-slate-700 text-sm font-medium block">Mật khẩu</label>
+                    <div className="space-y-1.5 sm:space-y-2">
+                        <label className="text-slate-700 text-xs sm:text-sm font-medium block">Mật khẩu</label>
                         <div className="relative">
                             <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400">
                                 <Lock className="w-5 h-5" />
@@ -80,7 +80,7 @@ const Login = () => {
                                 value={password}
                                 onChange={(e) => setPassword(e.target.value)}
                                 placeholder="••••••••"
-                                className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-10 pr-4 py-3 text-slate-800 placeholder-slate-400 focus:outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-600 transition duration-200"
+                                className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-10 pr-4 py-2.5 sm:py-3 text-base sm:text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-600 transition duration-200"
                             />
                         </div>
                     </div>

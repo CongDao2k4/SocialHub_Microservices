@@ -63,9 +63,9 @@ const Feed = () => {
     return (
         <div className="space-y-6">
             {/* Tiêu đề trang */}
-            <div className="mb-6">
-                <h1 className="text-3xl font-extrabold tracking-tight text-slate-900">Bảng Tin</h1>
-                <p className="text-slate-600 text-sm mt-1">Cập nhật những hoạt động mới nhất từ bạn bè của bạn.</p>
+            <div className="mb-4 sm:mb-6">
+                <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900">Bảng Tin</h1>
+                <p className="text-slate-600 text-xs sm:text-sm mt-0.5 sm:mt-1">Cập nhật những hoạt động mới nhất từ bạn bè của bạn.</p>
             </div>
 
             {/* Hộp đăng bài */}

@@ -681,7 +681,7 @@ const Messages = () => {
                                                 </span>
                                             )}
 
-                                            <div className={`flex items-end space-x-2 ${isMe ? "justify-end" : "justify-start"} max-w-[80%]`}>
+                                            <div className={`flex items-end space-x-2 ${isMe ? "justify-end" : "justify-start"} max-w-[88%] sm:max-w-[80%]`}>
                                                 {!isMe && (
                                                     <img
                                                         src={sender.avatarUrl || `https://api.dicebear.com/7.x/adventurer/svg?seed=${msg.senderId}`}

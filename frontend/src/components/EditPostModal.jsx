@@ -106,8 +106,8 @@ const EditPostModal = ({ post, imageUrl, onClose, onPostUpdated }) => {
     }, [newImagePreview]);
 
     return (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-            <div className="bg-white border border-slate-200 rounded-2xl w-full max-w-lg overflow-hidden shadow-2xl animate-fadeIn">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-4">
+            <div className="bg-white border border-slate-200 rounded-2xl w-full max-w-lg max-h-[90vh] flex flex-col overflow-hidden shadow-2xl animate-fadeIn">
                 
                 {/* Header */}
                 <div className="flex items-center justify-between p-4 border-b border-slate-200 bg-slate-50">
@@ -121,7 +121,7 @@ const EditPostModal = ({ post, imageUrl, onClose, onPostUpdated }) => {
                 </div>
 
                 {/* Form */}
-                <form onSubmit={handleSubmit} className="p-4 space-y-4">
+                <form onSubmit={handleSubmit} className="p-4 space-y-4 flex-1 overflow-y-auto">
                     
                     {/* Ô nhập nội dung chữ */}
                     <div className="space-y-1">

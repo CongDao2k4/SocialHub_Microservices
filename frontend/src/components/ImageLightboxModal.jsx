@@ -92,10 +92,10 @@ const ImageLightboxModal = ({
             {total > 1 && (
                 <button
                     onClick={handlePrev}
-                    className="absolute left-4 top-1/2 -translate-y-1/2 p-3 bg-white/10 hover:bg-white/25 text-white rounded-full transition cursor-pointer z-50 backdrop-blur-md border border-white/10 hover:scale-110 active:scale-95"
+                    className="absolute left-2 sm:left-4 top-1/2 -translate-y-1/2 p-2 sm:p-3 bg-white/10 hover:bg-white/25 text-white rounded-full transition cursor-pointer z-50 backdrop-blur-md border border-white/10 hover:scale-110 active:scale-95"
                     title="Ảnh trước (Mũi tên Trái)"
                 >
-                    <ChevronLeft className="w-7 h-7" />
+                    <ChevronLeft className="w-6 h-6 sm:w-7 sm:h-7" />
                 </button>
             )}
 
@@ -103,10 +103,10 @@ const ImageLightboxModal = ({
             {total > 1 && (
                 <button
                     onClick={handleNext}
-                    className="absolute right-4 top-1/2 -translate-y-1/2 p-3 bg-white/10 hover:bg-white/25 text-white rounded-full transition cursor-pointer z-50 backdrop-blur-md border border-white/10 hover:scale-110 active:scale-95"
+                    className="absolute right-2 sm:right-4 top-1/2 -translate-y-1/2 p-2 sm:p-3 bg-white/10 hover:bg-white/25 text-white rounded-full transition cursor-pointer z-50 backdrop-blur-md border border-white/10 hover:scale-110 active:scale-95"
                     title="Ảnh tiếp theo (Mũi tên Phải)"
                 >
-                    <ChevronRight className="w-7 h-7" />
+                    <ChevronRight className="w-6 h-6 sm:w-7 sm:h-7" />
                 </button>
             )}
 

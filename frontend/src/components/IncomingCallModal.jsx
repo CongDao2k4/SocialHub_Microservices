@@ -49,7 +49,7 @@ const IncomingCallModal = ({ incomingCall, onAccept, onReject }) => {
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 backdrop-blur-md animate-fadeIn p-4">
-            <div className="bg-slate-900 border border-slate-800 rounded-3xl p-8 w-full max-w-sm flex flex-col items-center text-center space-y-6 shadow-2xl relative overflow-hidden">
+            <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 w-full max-w-sm flex flex-col items-center text-center space-y-5 sm:space-y-6 shadow-2xl relative overflow-hidden">
                 {/* Background pulse effect */}
                 <div className="absolute inset-0 bg-blue-500/10 animate-pulse pointer-events-none" />
 

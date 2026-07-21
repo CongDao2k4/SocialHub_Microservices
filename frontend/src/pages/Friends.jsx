@@ -302,10 +302,10 @@ const Friends = () => {
             )}
 
             {/* HỆ THỐNG TABS ĐIỀU HƯỚNG CHÍNH */}
-            <div className="flex border-b border-slate-200">
+            <div className="flex border-b border-slate-200 overflow-x-auto no-scrollbar">
                 <button
                     onClick={() => setActiveTab("requests")}
-                    className={`flex items-center space-x-2 px-6 py-3 font-semibold text-sm border-b-2 transition cursor-pointer ${
+                    className={`flex items-center space-x-2 px-4 sm:px-6 py-3 font-semibold text-xs sm:text-sm border-b-2 transition cursor-pointer whitespace-nowrap ${
                         activeTab === "requests" ? "border-blue-600 text-blue-600" : "border-transparent text-slate-500 hover:text-slate-800"
                     }`}
                 >
@@ -313,7 +313,7 @@ const Friends = () => {
                 </button>
                 <button
                     onClick={() => setActiveTab("list")}
-                    className={`flex items-center space-x-2 px-6 py-3 font-semibold text-sm border-b-2 transition cursor-pointer ${
+                    className={`flex items-center space-x-2 px-4 sm:px-6 py-3 font-semibold text-xs sm:text-sm border-b-2 transition cursor-pointer whitespace-nowrap ${
                         activeTab === "list" ? "border-blue-600 text-blue-600" : "border-transparent text-slate-500 hover:text-slate-800"
                     }`}
                 >
@@ -321,7 +321,7 @@ const Friends = () => {
                 </button>
                 <button
                     onClick={() => setActiveTab("suggestions")}
-                    className={`flex items-center space-x-2 px-6 py-3 font-semibold text-sm border-b-2 transition cursor-pointer ${
+                    className={`flex items-center space-x-2 px-4 sm:px-6 py-3 font-semibold text-xs sm:text-sm border-b-2 transition cursor-pointer whitespace-nowrap ${
                         activeTab === "suggestions" ? "border-blue-600 text-blue-600" : "border-transparent text-slate-500 hover:text-slate-800"
                     }`}
                 >
@@ -338,26 +338,26 @@ const Friends = () => {
                     {/* TAB 1: LỜI MỜI ĐÃ NHẬN */}
                     {activeTab === "requests" && (
                         requests.length > 0 ? (
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 animate-fadeIn">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6 animate-fadeIn">
                                 {requests.map(r => (
-                                    <div key={r.id} className="bg-white border border-slate-200 rounded-2xl p-5 flex items-center justify-between shadow-sm">
+                                    <div key={r.id} className="bg-white border border-slate-200 rounded-2xl p-4 sm:p-5 flex items-center justify-between shadow-sm">
                                         <Link to={`/profile/${r.fromUserId}`} className="flex items-center space-x-3 group cursor-pointer">
-                                            <img src={r.user?.avatarUrl || "https://api.dicebear.com/7.x/adventurer/svg?seed=Felix"} className="w-12 h-12 rounded-full border border-slate-200 group-hover:opacity-80 transition object-cover" alt="Avatar" />
+                                            <img src={r.user?.avatarUrl || "https://api.dicebear.com/7.x/adventurer/svg?seed=Felix"} className="w-10 h-10 sm:w-12 sm:h-12 rounded-full border border-slate-200 group-hover:opacity-80 transition object-cover" alt="Avatar" />
                                             <div>
-                                                <p className="font-bold text-slate-800 group-hover:text-blue-600 transition">{r.user?.displayName}</p>
-                                                <p className="text-xs text-slate-500">Gửi lúc: {new Date(r.createdAt).toLocaleDateString()}</p>
+                                                <p className="font-bold text-slate-800 text-sm group-hover:text-blue-600 transition">{r.user?.displayName}</p>
+                                                <p className="text-[11px] text-slate-500">Gửi: {new Date(r.createdAt).toLocaleDateString()}</p>
                                             </div>
                                         </Link>
-                                        <div className="flex space-x-2">
+                                        <div className="flex space-x-1.5 sm:space-x-2">
                                             <button
                                                 onClick={() => handleAccept(r.id, r.fromUserId)}
-                                                className="px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold cursor-pointer transition shadow-md shadow-blue-600/10"
+                                                className="px-3 py-1.5 sm:px-3.5 sm:py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold cursor-pointer transition shadow-md shadow-blue-600/10"
                                             >
                                                 Đồng ý
                                             </button>
                                             <button
                                                 onClick={() => handleReject(r.id)}
-                                                className="px-3.5 py-2 bg-slate-50 hover:bg-slate-100 text-slate-600 rounded-xl text-xs font-semibold cursor-pointer transition border border-slate-200"
+                                                className="px-3 py-1.5 sm:px-3.5 sm:py-2 bg-slate-50 hover:bg-slate-100 text-slate-600 rounded-xl text-xs font-semibold cursor-pointer transition border border-slate-200"
                                             >
                                                 Từ chối
                                             </button>
@@ -373,7 +373,7 @@ const Friends = () => {
                     {/* TAB 2: DANH SÁCH BẠN BÈ */}
                     {activeTab === "list" && (
                         friends.length > 0 ? (
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 animate-fadeIn">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 animate-fadeIn">
                                 {friends.map(f => (
                                     <div key={f.id} className="bg-white border border-slate-200 rounded-2xl p-4 flex flex-col items-center text-center space-y-3 shadow-sm">
                                         <Link to={`/profile/${f.id}`} className="group block cursor-pointer">

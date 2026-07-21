@@ -10,8 +10,8 @@ const CreateGroupModal = ({
     onSubmit
 }) => {
     return (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-            <div className="bg-white border border-slate-200 rounded-2xl w-full max-w-sm overflow-hidden shadow-2xl animate-fadeIn">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-4">
+            <div className="bg-white border border-slate-200 rounded-2xl w-full max-w-sm max-h-[90vh] flex flex-col overflow-hidden shadow-2xl animate-fadeIn">
                 <div className="flex items-center justify-between p-4 border-b border-slate-200 bg-slate-50">
                     <h3 className="font-bold text-slate-800 text-sm">Tạo nhóm chat mới</h3>
                     <button
@@ -22,7 +22,7 @@ const CreateGroupModal = ({
                     </button>
                 </div>
 
-                <form onSubmit={onSubmit} className="p-4 space-y-4">
+                <form onSubmit={onSubmit} className="p-4 space-y-4 flex-1 overflow-y-auto">
                     <div>
                         <label className="block text-[10px] text-slate-500 font-semibold uppercase mb-1">Tên nhóm</label>
                         <input
@@ -30,7 +30,7 @@ const CreateGroupModal = ({
                             value={groupName}
                             onChange={(e) => setGroupName(e.target.value)}
                             placeholder="Ví dụ: Nhóm Học Tập..."
-                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-blue-600 transition"
+                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-base sm:text-xs focus:outline-none focus:border-blue-600 transition"
                         />
                     </div>
 

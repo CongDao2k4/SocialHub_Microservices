@@ -348,7 +348,7 @@ const ChatBox = ({ conversation, onClose, currentUserId }) => {
     };
 
     return (
-        <div className="w-80 bg-white border border-slate-200 rounded-t-2xl shadow-xl flex flex-col h-[400px]">
+        <div className="w-full sm:w-80 bg-white border border-slate-200 sm:rounded-t-2xl shadow-2xl flex flex-col h-[75vh] max-h-[500px] sm:h-[420px] rounded-t-2xl transition-all duration-200">
             {/* Header hộp thoại */}
             <div className="flex items-center justify-between p-3 border-b border-slate-200 bg-slate-50 rounded-t-2xl">
                 <div className="flex items-center space-x-2.5">
