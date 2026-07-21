@@ -25,7 +25,17 @@ const PostDetail = () => {
                 setError("Không tìm thấy bài viết hoặc bài viết đã bị xóa.");
             }
         } catch (err) {
-            console.error("❌ Lỗi khi tải chi tiết bài viết:", err.message);
+            console.warn("⚠️ Lỗi khi tải chi tiết bài viết, thử kiểm tra nếu đây là Reel:", err.message);
+            try {
+                const reelRes = await api.get(`/reels/${id}`);
+                if (reelRes.data && reelRes.data.success && reelRes.data.data) {
+                    // Nếu đúng là Reel -> Tự động chuyển hướng ngay sang trang Reels!
+                    navigate(`/reels?id=${id}`, { replace: true });
+                    return;
+                }
+            } catch (reelErr) {
+                console.warn("⚠️ Không phải Reel:", reelErr.message);
+            }
             setError("Không tìm thấy bài viết hoặc bài viết đã bị xóa.");
         } finally {
             setIsLoading(false);

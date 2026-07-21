@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import api from "../services/api";
 import { 
@@ -211,6 +212,9 @@ const ReelItem = ({ reel, isActive, isMuted, toggleMute, onLikeToggle, onOpenCom
 
 // Component chính trang Reels
 const Reels = () => {
+  const [searchParams] = useSearchParams();
+  const targetReelId = searchParams.get("id");
+
   const [reels, setReels] = useState([]);
   const [activeReelIndex, setActiveReelIndex] = useState(0);
   const [isMuted, setIsMuted] = useState(true);
@@ -236,14 +240,28 @@ const Reels = () => {
   // Load danh sách Reels từ Backend
   const fetchReels = async (currentPage) => {
     try {
+      // 1. Tải danh sách Reels theo trang
       const res = await api.get(`/reels?page=${currentPage}&limit=5`);
-      if (res.data && res.data.success) {
-        const list = res.data.data || [];
-        if (list.length === 0) {
-          setHasMore(false);
-        } else {
-          setReels(prev => (currentPage === 1 ? list : [...prev, ...list]));
+      let list = (res.data && res.data.success) ? (res.data.data || []) : [];
+
+      // 2. Nếu ở Trang 1 và URL có tham số id (Reel được chia sẻ từ tin nhắn)
+      if (currentPage === 1 && targetReelId) {
+        try {
+          const targetRes = await api.get(`/reels/${targetReelId}`);
+          if (targetRes.data && targetRes.data.success && targetRes.data.data) {
+            const targetReel = targetRes.data.data;
+            // Loại bỏ trùng lặp và đưa Reel được chia sẻ lên Vị trí đầu tiên (Index 0)
+            list = [targetReel, ...list.filter(r => r.id !== targetReelId)];
+          }
+        } catch (singleErr) {
+          console.warn("⚠️ Không lấy được Reel cụ thể theo ID:", singleErr.message);
         }
+      }
+
+      if (list.length === 0) {
+        setHasMore(false);
+      } else {
+        setReels(prev => (currentPage === 1 ? list : [...prev, ...list]));
       }
     } catch (err) {
       console.error("❌ Lỗi tải Reels:", err.message);
@@ -254,7 +272,7 @@ const Reels = () => {
 
   useEffect(() => {
     fetchReels(1);
-  }, []);
+  }, [targetReelId]);
 
   // Thiết lập IntersectionObserver theo dõi video nào đang hiển thị ở tâm viewport
   useEffect(() => {

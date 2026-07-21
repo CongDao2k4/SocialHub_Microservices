@@ -88,9 +88,9 @@ const RenderShareMessage = ({ msgContent, isMe, onNavigate }) => {
                 </div>
             )}
             
-            {/* Block bài viết chia sẻ kiểu Facebook */}
+            {/* Block bài viết / Reel chia sẻ kiểu Facebook */}
             <div
-                onClick={() => onNavigate(`/post/${data.postId}`)}
+                onClick={() => onNavigate(data.isReel ? `/reels?id=${data.postId}` : `/post/${data.postId}`)}
                 className="bg-slate-50 border border-slate-200 hover:border-blue-400 hover:bg-slate-100 rounded-xl overflow-hidden shadow-sm cursor-pointer transition duration-150 text-left w-full max-w-[190px] flex flex-col"
             >
                 {/* Phần hình ảnh ở trên */}

@@ -74,7 +74,8 @@ const ShareModal = ({ post, onClose, onShareSuccess }) => {
             authorName: post.author?.displayName || "Người dùng SocialHub",
             authorAvatar: post.author?.avatarUrl || null,
             shareText: shareText.trim(),
-            mediaId: post.media_ids && post.media_ids.length > 0 ? post.media_ids[0] : null
+            mediaId: post.media_ids && post.media_ids.length > 0 ? post.media_ids[0] : null,
+            isReel: post.isReel || false
         };
 
         // Gửi qua WebSocket với type: "share"

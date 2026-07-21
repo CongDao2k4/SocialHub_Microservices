@@ -20,10 +20,10 @@ const RenderShareMessage = ({ msgContent, isMe, onNavigate }) => {
                 </div>
             )}
 
-            {/* Block bài viết chia sẻ kiểu Facebook */}
+            {/* Block bài viết / Reel chia sẻ kiểu Facebook */}
             <div
-                onClick={() => onNavigate(`/post/${data.postId}`)}
-                className="bg-slate-50 border border-slate-200 hover:border-blue-400 hover:bg-slate-100 rounded-2xl overflow-hidden shadow-sm cursor-pointer transition duration-200 text-left w-full max-w-[285px] flex flex-col"
+                onClick={() => onNavigate(data.isReel ? `/reels?id=${data.postId}` : `/post/${data.postId}`)}
+                className="bg-slate-50 border border-slate-200 hover:border-blue-400 hover:bg-slate-100 rounded-2xl overflow-hidden shadow-sm cursor-pointer transition duration-200 text-left w-full max-w-[285px] flex flex-col group"
             >
                 {/* Phần hình ảnh ở trên */}
                 {data.mediaId ? (
@@ -61,7 +61,9 @@ const RenderShareMessage = ({ msgContent, isMe, onNavigate }) => {
 
                     <div className="pt-1.5 flex items-center space-x-1.5 border-t border-slate-200/40">
                         <img src="/logo.svg" alt="SocialHub Logo" className="w-3.5 h-3.5 object-contain" />
-                        <span className="text-[10px] font-bold tracking-wider text-slate-400 uppercase">SocialHub Post</span>
+                        <span className="text-[10px] font-bold tracking-wider text-slate-400 uppercase">
+                            {data.isReel ? "SocialHub Reel 🎬" : "SocialHub Post"}
+                        </span>
                     </div>
                 </div>
             </div>
