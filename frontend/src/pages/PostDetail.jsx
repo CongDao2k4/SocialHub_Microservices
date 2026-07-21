@@ -60,41 +60,53 @@ const PostDetail = () => {
 
     return (
         <div className="space-y-6 max-w-2xl mx-auto">
-            {/* Nút quay lại */}
-            <div className="flex items-center space-x-3">
-                <button
-                    onClick={() => navigate(-1)}
-                    className="flex items-center space-x-2 text-slate-600 hover:text-blue-600 p-2 rounded-xl hover:bg-slate-200/50 transition cursor-pointer"
-                >
-                    <ArrowLeft className="w-5 h-5" />
-                    <span className="font-medium text-sm">Quay lại</span>
-                </button>
-                <h1 className="text-xl font-bold text-slate-800">Chi tiết bài viết</h1>
-            </div>
-
             {/* Content Body */}
             {isLoading ? (
-                <div className="flex justify-center py-16">
+                <div className="flex flex-col items-center justify-center py-20 space-y-3">
                     <Loader className="w-8 h-8 text-blue-600 animate-spin" />
+                    <span className="text-xs text-slate-500 font-medium">Đang chuyển hướng...</span>
                 </div>
             ) : error ? (
-                <div className="text-center py-16 bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
-                    <MessageCircle className="w-12 h-12 text-slate-400 mx-auto mb-4" />
-                    <p className="text-slate-700 text-lg font-semibold">{error}</p>
-                    <Link
-                        to="/"
-                        className="inline-block mt-4 text-sm font-medium text-blue-600 hover:underline"
-                    >
-                        Trở về trang chủ
-                    </Link>
+                <div className="space-y-6">
+                    <div className="flex items-center space-x-3">
+                        <button
+                            onClick={() => navigate(-1)}
+                            className="flex items-center space-x-2 text-slate-600 hover:text-blue-600 p-2 rounded-xl hover:bg-slate-200/50 transition cursor-pointer"
+                        >
+                            <ArrowLeft className="w-5 h-5" />
+                            <span className="font-medium text-sm">Quay lại</span>
+                        </button>
+                    </div>
+                    <div className="text-center py-16 bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
+                        <MessageCircle className="w-12 h-12 text-slate-400 mx-auto mb-4" />
+                        <p className="text-slate-700 text-lg font-semibold">{error}</p>
+                        <Link
+                            to="/"
+                            className="inline-block mt-4 text-sm font-medium text-blue-600 hover:underline"
+                        >
+                            Trở về trang chủ
+                        </Link>
+                    </div>
                 </div>
             ) : post ? (
-                <PostCard
-                    post={post}
-                    currentUserId={user?.id}
-                    onPostDeleted={handlePostDeleted}
-                    onPostUpdated={handlePostUpdated}
-                />
+                <div className="space-y-6">
+                    <div className="flex items-center space-x-3">
+                        <button
+                            onClick={() => navigate(-1)}
+                            className="flex items-center space-x-2 text-slate-600 hover:text-blue-600 p-2 rounded-xl hover:bg-slate-200/50 transition cursor-pointer"
+                        >
+                            <ArrowLeft className="w-5 h-5" />
+                            <span className="font-medium text-sm">Quay lại</span>
+                        </button>
+                        <h1 className="text-xl font-bold text-slate-800">Chi tiết bài viết</h1>
+                    </div>
+                    <PostCard
+                        post={post}
+                        currentUserId={user?.id}
+                        onPostDeleted={handlePostDeleted}
+                        onPostUpdated={handlePostUpdated}
+                    />
+                </div>
             ) : null}
         </div>
     );

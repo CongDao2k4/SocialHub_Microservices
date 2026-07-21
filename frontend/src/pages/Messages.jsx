@@ -27,11 +27,15 @@ import {
 const formatLastMessagePreview = (lastMsg) => {
     if (!lastMsg) return "Chưa có tin nhắn...";
     if (lastMsg.type === "image") return "Đã gửi tệp media";
-    if (lastMsg.type === "share") return "Đã chia sẻ một bài viết";
     const content = lastMsg.content || "";
     if (content.trim().startsWith("{") && content.includes('"postId"')) {
+        try {
+            const parsed = JSON.parse(content);
+            if (parsed.isReel) return "Đã chia sẻ một thước phim 🎬";
+        } catch (e) {}
         return "Đã chia sẻ một bài viết";
     }
+    if (lastMsg.type === "share") return "Đã chia sẻ một bài viết";
     return content;
 };
 

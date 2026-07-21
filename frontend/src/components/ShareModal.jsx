@@ -119,7 +119,9 @@ const ShareModal = ({ post, onClose, onShareSuccess }) => {
             <div className="bg-white border border-slate-200 w-full max-w-lg p-6 rounded-2xl shadow-2xl space-y-4 relative">
                 {/* Header modal */}
                 <div className="flex items-center justify-between border-b border-slate-200 pb-3">
-                    <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">Chia sẻ bài viết</h3>
+                    <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">
+                        {post?.isReel ? "Chia sẻ Thước phim (Reel)" : "Chia sẻ bài viết"}
+                    </h3>
                     <button onClick={onClose} className="p-1 hover:bg-slate-100 rounded-full text-slate-400 hover:text-slate-700 cursor-pointer transition">
                         <X className="w-4 h-4" />
                     </button>
