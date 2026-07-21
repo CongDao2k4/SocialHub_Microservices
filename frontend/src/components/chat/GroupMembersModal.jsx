@@ -56,8 +56,8 @@ const GroupMembersModal = ({ conversation, onClose, onGroupUpdated, friends }) =
     };
 
     return (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-            <div className="bg-white border border-slate-200 rounded-2xl w-full max-w-md overflow-hidden shadow-2xl animate-fadeIn">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-4">
+            <div className="bg-white border border-slate-200 rounded-2xl w-full max-w-md max-h-[90vh] flex flex-col overflow-hidden shadow-2xl animate-fadeIn">
                 {/* Header */}
                 <div className="flex items-center justify-between p-4 border-b border-slate-200 bg-slate-50">
                     <h3 className="font-bold text-slate-800 text-sm">Quản lý thành viên nhóm</h3>
@@ -69,7 +69,7 @@ const GroupMembersModal = ({ conversation, onClose, onGroupUpdated, friends }) =
                     </button>
                 </div>
 
-                <div className="p-5 space-y-5">
+                <div className="p-4 sm:p-5 space-y-5 flex-1 overflow-y-auto">
                     {/* Danh sách thành viên hiện tại */}
                     <div>
                         <h4 className="text-[10px] text-slate-500 font-bold uppercase tracking-wider mb-2">

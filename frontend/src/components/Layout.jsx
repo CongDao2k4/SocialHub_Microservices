@@ -71,22 +71,22 @@ const Layout = () => {
             )}
 
             {/* Header Top Bar Mobile (Chỉ hiện trên di động < 768px) */}
-            <header className="md:hidden fixed top-0 inset-x-0 h-14 bg-white border-b border-slate-200 px-4 flex items-center justify-between z-40 shadow-sm">
+            <header className="md:hidden fixed top-0 inset-x-0 h-14 bg-white/90 backdrop-blur-md border-b border-slate-200/80 px-4 flex items-center justify-between z-40 shadow-sm">
                 <Link to="/" className="flex items-center space-x-2">
                     <img src="/logo.svg" alt="SocialHub Logo" className="w-8 h-8 object-contain" />
-                    <span className="text-lg font-bold text-slate-800 tracking-tight">SocialHub</span>
+                    <span className="text-lg font-extrabold text-slate-800 tracking-tight">SocialHub</span>
                 </Link>
-                <div className="flex items-center space-x-3">
-                    <Link to={`/profile/${user?.id}`} className="flex items-center">
+                <div className="flex items-center space-x-2">
+                    <Link to={`/profile/${user?.id}`} className="flex items-center p-1 rounded-full hover:bg-slate-100 transition">
                         <img
                             src={user?.avatarUrl || "https://api.dicebear.com/7.x/adventurer/svg?seed=Felix"}
                             alt="Avatar"
-                            className="w-8 h-8 rounded-full border border-slate-200 object-cover"
+                            className="w-8 h-8 rounded-full border border-slate-200 object-cover ring-2 ring-blue-500/20"
                         />
                     </Link>
                     <button
                         onClick={handleLogout}
-                        className="p-1.5 text-slate-500 hover:text-red-600 rounded-lg hover:bg-slate-100 transition"
+                        className="p-2 text-slate-500 hover:text-red-600 rounded-xl hover:bg-red-50 transition active:scale-95 cursor-pointer"
                         title="Đăng xuất"
                     >
                         <LogOut className="w-5 h-5" />
@@ -169,38 +169,38 @@ const Layout = () => {
             </aside>
 
             {/* Bottom Navigation Bar Mobile (Chỉ hiện trên di động < 768px) */}
-            <nav className="md:hidden fixed bottom-0 inset-x-0 h-16 bg-white border-t border-slate-200 z-40 flex items-center justify-around px-2 shadow-lg">
-                <Link to="/" className={`flex flex-col items-center justify-center w-12 h-12 rounded-xl transition ${location.pathname === "/" ? "text-blue-600 font-bold" : "text-slate-500"}`}>
+            <nav className="md:hidden fixed bottom-0 inset-x-0 h-16 bg-white/95 backdrop-blur-md border-t border-slate-200/80 z-40 flex items-center justify-around px-2 shadow-lg active:touch-none select-none">
+                <Link to="/" className={`flex flex-col items-center justify-center w-14 h-12 rounded-xl transition active:scale-95 ${location.pathname === "/" ? "text-blue-600 font-bold" : "text-slate-500 hover:text-slate-800"}`}>
                     <Home className="w-5 h-5" />
-                    <span className="text-[10px] mt-0.5">Feed</span>
+                    <span className="text-[10px] mt-0.5 font-medium">Feed</span>
                 </Link>
-                <Link to="/friends" className={`flex flex-col items-center justify-center w-12 h-12 rounded-xl transition ${location.pathname.startsWith("/friends") ? "text-blue-600 font-bold" : "text-slate-500"}`}>
+                <Link to="/friends" className={`flex flex-col items-center justify-center w-14 h-12 rounded-xl transition active:scale-95 ${location.pathname.startsWith("/friends") ? "text-blue-600 font-bold" : "text-slate-500 hover:text-slate-800"}`}>
                     <Users className="w-5 h-5" />
-                    <span className="text-[10px] mt-0.5">Bạn bè</span>
+                    <span className="text-[10px] mt-0.5 font-medium">Bạn bè</span>
                 </Link>
-                <Link to="/reels" className={`flex flex-col items-center justify-center w-12 h-12 rounded-xl transition ${location.pathname.startsWith("/reels") ? "text-blue-600 font-bold" : "text-slate-500"}`}>
+                <Link to="/reels" className={`flex flex-col items-center justify-center w-14 h-12 rounded-xl transition active:scale-95 ${location.pathname.startsWith("/reels") ? "text-blue-600 font-bold" : "text-slate-500 hover:text-slate-800"}`}>
                     <Film className="w-5 h-5" />
-                    <span className="text-[10px] mt-0.5">Reels</span>
+                    <span className="text-[10px] mt-0.5 font-medium">Reels</span>
                 </Link>
-                <Link to="/messages" className={`flex flex-col items-center justify-center w-12 h-12 rounded-xl transition ${location.pathname.startsWith("/messages") ? "text-blue-600 font-bold" : "text-slate-500"}`}>
+                <Link to="/messages" className={`flex flex-col items-center justify-center w-14 h-12 rounded-xl transition active:scale-95 ${location.pathname.startsWith("/messages") ? "text-blue-600 font-bold" : "text-slate-500 hover:text-slate-800"}`}>
                     <MessageSquare className="w-5 h-5" />
-                    <span className="text-[10px] mt-0.5">Chat</span>
+                    <span className="text-[10px] mt-0.5 font-medium">Chat</span>
                 </Link>
-                <Link to="/notifications" className={`flex flex-col items-center justify-center w-12 h-12 rounded-xl transition relative ${location.pathname.startsWith("/notifications") ? "text-blue-600 font-bold" : "text-slate-500"}`}>
+                <Link to="/notifications" className={`flex flex-col items-center justify-center w-14 h-12 rounded-xl transition active:scale-95 relative ${location.pathname.startsWith("/notifications") ? "text-blue-600 font-bold" : "text-slate-500 hover:text-slate-800"}`}>
                     <div className="relative">
                         <Bell className="w-5 h-5" />
                         {unreadCount > 0 && (
-                            <span className="absolute -top-1 -right-1 bg-red-500 text-white font-bold text-[9px] w-4 h-4 rounded-full flex items-center justify-center">
+                            <span className="absolute -top-1 -right-1.5 bg-red-500 text-white font-bold text-[9px] w-4 h-4 rounded-full flex items-center justify-center shadow-sm">
                                 {unreadCount > 9 ? "9+" : unreadCount}
                             </span>
                         )}
                     </div>
-                    <span className="text-[10px] mt-0.5">Thông báo</span>
+                    <span className="text-[10px] mt-0.5 font-medium">Thông báo</span>
                 </Link>
             </nav>
 
             {/* Nội dung chính bên phải */}
-            <main className={`flex-1 ml-0 md:ml-64 lg:mr-64 pt-16 pb-20 md:pt-8 md:pb-8 min-h-screen ${isMessagesPage ? "p-2 md:p-4" : "p-3 md:p-8"}`}>
+            <main className={`flex-1 ml-0 md:ml-64 lg:mr-64 pt-16 pb-20 md:pt-8 md:pb-8 min-h-screen ${isMessagesPage ? "p-2 md:p-4" : "p-3 sm:p-6 md:p-8"}`}>
                 <div className={isMessagesPage ? "w-full h-full" : "max-w-4xl mx-auto"}>
                     <Outlet /> {/* Nơi các trang con hiển thị */}
                 </div>

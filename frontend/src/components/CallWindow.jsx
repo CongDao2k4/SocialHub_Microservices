@@ -711,7 +711,7 @@ const CallWindow = ({ activeCall, chatSocket, currentUserId, onClose }) => {
                             )}
 
                             {callType === "video" && (
-                                <div className="absolute bottom-4 right-4 w-36 h-48 bg-slate-900 border-2 border-slate-700 rounded-2xl overflow-hidden shadow-2xl z-10">
+                                <div className="absolute bottom-20 right-3 sm:bottom-4 sm:right-4 w-24 h-36 sm:w-36 sm:h-48 bg-slate-900 border-2 border-slate-700 rounded-2xl overflow-hidden shadow-2xl z-10">
                                     <video
                                         ref={localVideoRef}
                                         autoPlay
@@ -732,32 +732,32 @@ const CallWindow = ({ activeCall, chatSocket, currentUserId, onClose }) => {
 
                 {/* Footer Thanh Điều Khiển Cuộc Gọi */}
                 {!isMinimized && (
-                    <div className="p-6 bg-gradient-to-t from-black/90 to-transparent flex items-center justify-center space-x-6 z-20">
+                    <div className="p-4 sm:p-6 bg-gradient-to-t from-black/90 to-transparent flex items-center justify-center space-x-4 sm:space-x-6 z-20">
                         <button
                             onClick={toggleMute}
-                            className={`p-4 rounded-full border transition cursor-pointer ${isMuted ? "bg-rose-600 border-rose-500 text-white" : "bg-slate-800 hover:bg-slate-700 border-slate-600 text-white"
+                            className={`p-3.5 sm:p-4 rounded-full border transition cursor-pointer active:scale-95 ${isMuted ? "bg-rose-600 border-rose-500 text-white" : "bg-slate-800 hover:bg-slate-700 border-slate-600 text-white"
                                 }`}
                             title={isMuted ? "Bật Micro" : "Tắt Micro"}
                         >
-                            {isMuted ? <MicOff className="w-6 h-6" /> : <Mic className="w-6 h-6" />}
+                            {isMuted ? <MicOff className="w-5 h-5 sm:w-6 sm:h-6" /> : <Mic className="w-5 h-5 sm:w-6 sm:h-6" />}
                         </button>
 
                         <button
                             onClick={handleEndCall}
-                            className="p-4 rounded-full bg-rose-600 hover:bg-rose-700 text-white border border-rose-500 shadow-lg cursor-pointer transition transform hover:scale-105"
+                            className="p-3.5 sm:p-4 rounded-full bg-rose-600 hover:bg-rose-700 text-white border border-rose-500 shadow-lg cursor-pointer transition transform active:scale-95 hover:scale-105"
                             title="Kết thúc cuộc gọi"
                         >
-                            <PhoneOff className="w-7 h-7" />
+                            <PhoneOff className="w-6 h-6 sm:w-7 sm:h-7" />
                         </button>
 
                         {callType === "video" && (
                             <button
                                 onClick={toggleVideo}
-                                className={`p-4 rounded-full border transition cursor-pointer ${isVideoOff ? "bg-rose-600 border-rose-500 text-white" : "bg-slate-800 hover:bg-slate-700 border-slate-600 text-white"
+                                className={`p-3.5 sm:p-4 rounded-full border transition cursor-pointer active:scale-95 ${isVideoOff ? "bg-rose-600 border-rose-500 text-white" : "bg-slate-800 hover:bg-slate-700 border-slate-600 text-white"
                                     }`}
                                 title={isVideoOff ? "Bật Camera" : "Tắt Camera"}
                             >
-                                {isVideoOff ? <VideoOff className="w-6 h-6" /> : <Video className="w-6 h-6" />}
+                                {isVideoOff ? <VideoOff className="w-5 h-5 sm:w-6 sm:h-6" /> : <Video className="w-5 h-5 sm:w-6 sm:h-6" />}
                             </button>
                         )}
                     </div>

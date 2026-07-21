@@ -108,8 +108,8 @@ const CreateReelModal = ({ onClose, onUploadSuccess }) => {
   };
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 animate-fadeIn select-none">
-      <div className="bg-slate-900 border border-white/10 w-full max-w-lg p-6 rounded-2xl shadow-2xl space-y-4 relative flex flex-col">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-sm p-3 sm:p-4 animate-fadeIn select-none">
+      <div className="bg-slate-900 border border-white/10 w-full max-w-lg max-h-[90vh] p-4 sm:p-6 rounded-2xl shadow-2xl space-y-4 relative flex flex-col overflow-hidden">
         {/* Header Modal */}
         <div className="flex items-center justify-between border-b border-white/10 pb-3">
           <h3 className="text-sm font-bold text-white uppercase tracking-wider flex items-center space-x-2">
@@ -126,7 +126,7 @@ const CreateReelModal = ({ onClose, onUploadSuccess }) => {
         </div>
 
         {/* Form Đăng Reel */}
-        <form onSubmit={handleSubmit} className="space-y-4 flex-1 flex flex-col">
+        <form onSubmit={handleSubmit} className="space-y-4 flex-1 flex flex-col overflow-y-auto pr-1">
           {/* Vùng chọn Video */}
           <div
             onDragOver={handleDragOver}

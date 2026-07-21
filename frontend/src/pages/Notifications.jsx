@@ -132,18 +132,18 @@ const Notifications = () => {
     return (
         <div className="space-y-6">
             {/* Header thông báo */}
-            <div className="flex items-center justify-between border-b border-slate-200 pb-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-200 pb-4 gap-3 sm:gap-0">
                 <div>
-                    <h1 className="text-3xl font-extrabold tracking-tight text-slate-900">Thông báo</h1>
-                    <p className="text-slate-600 text-sm mt-1">Nơi lưu lại các lượt tương tác của mọi người với bạn.</p>
+                    <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900">Thông báo</h1>
+                    <p className="text-slate-600 text-xs sm:text-sm mt-0.5 sm:mt-1">Nơi lưu lại các lượt tương tác của mọi người với bạn.</p>
                 </div>
                 
                 {notifications.some(n => !n.isRead) && (
                     <button
                         onClick={handleMarkAllAsRead}
-                        className="flex items-center space-x-2 px-4 py-2 bg-white hover:bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-600 transition cursor-pointer shadow-sm"
+                        className="flex items-center justify-center space-x-1.5 sm:space-x-2 px-3 sm:px-4 py-2 bg-white hover:bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-600 transition cursor-pointer shadow-sm self-start sm:self-auto"
                     >
-                        <Check className="w-4 h-4" />
+                        <Check className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                         <span>Đánh dấu đọc tất cả</span>
                     </button>
                 )}
@@ -160,28 +160,31 @@ const Notifications = () => {
                         <div
                             key={notif.id}
                             onClick={() => handleMarkAsRead(notif)}
-                            className={`flex items-center justify-between p-4 rounded-2xl border transition duration-200 cursor-pointer ${
+                            className={`flex items-center justify-between p-3.5 sm:p-4 rounded-2xl border transition duration-200 cursor-pointer ${
                                 notif.isRead
                                     ? "bg-white border-slate-200 hover:bg-slate-50 text-slate-700 shadow-sm"
                                     : "bg-blue-50/50 border-blue-100 shadow-md shadow-blue-600/5 hover:bg-blue-100/30 text-slate-900"
                             }`}
                         >
-                            <div className="flex items-center space-x-4">
+                            <div className="flex items-center space-x-3 sm:space-x-4 min-w-0 flex-1">
                                 {/* Khung Avatar tròn kèm badge Icon tương tác đè góc */}
-                                <div className="relative">
+                                <div className="relative shrink-0">
                                     <img
                                         src={notif.fromUser?.avatarUrl || "https://api.dicebear.com/7.x/adventurer/svg?seed=Felix"}
                                         alt="Avatar"
-                                        className="w-12 h-12 rounded-full border border-slate-200 object-cover"
+                                        className="w-10 h-10 sm:w-12 sm:h-12 rounded-full border border-slate-200 object-cover"
                                     />
-                                    <div className="absolute -bottom-1 -right-1 p-1 bg-white rounded-full border border-slate-200 shadow-sm">
+                                    <div className="absolute -bottom-1 -right-1 p-0.5 sm:p-1 bg-white rounded-full border border-slate-200 shadow-sm">
                                         {getIcon(notif.type)}
                                     </div>
                                 </div>
                                 
-                                <div>
-                                    <p className="text-sm font-medium leading-relaxed">{notif.message}</p>
-                                    <p className="text-xs text-slate-500 mt-1">{new Date(notif.createdAt).toLocaleString()}</p>
+                                <div className="flex-1 min-w-0">
+                                    <p className="text-xs sm:text-sm font-medium leading-snug break-words">
+                                        <strong className="font-bold text-slate-900">{notif.fromUser?.displayName || "Một người dùng"}</strong>{" "}
+                                        {notif.message}
+                                    </p>
+                                    <p className="text-[10px] sm:text-xs text-slate-400 mt-1">{new Date(notif.createdAt).toLocaleString()}</p>
                                 </div>
                             </div>
 

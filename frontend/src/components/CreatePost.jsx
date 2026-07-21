@@ -96,19 +96,19 @@ const CreatePost = ({ onPostCreated }) => {
     };
 
     return (
-        <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm mb-6">
+        <div className="bg-white border border-slate-200 rounded-2xl p-4 sm:p-6 shadow-sm mb-6">
             <form onSubmit={handleSubmit} className="space-y-4">
-                <div className="flex items-start space-x-4">
+                <div className="flex items-start space-x-3 sm:space-x-4">
                     <img
                         src={user?.avatarUrl || "https://api.dicebear.com/7.x/adventurer/svg?seed=Felix"}
                         alt="Avatar"
-                        className="w-10 h-10 rounded-full border border-slate-200 object-cover"
+                        className="w-9 h-9 sm:w-10 sm:h-10 rounded-full border border-slate-200 object-cover shrink-0"
                     />
                     <textarea
                         value={content}
                         onChange={(e) => setContent(e.target.value)}
                         placeholder={`${user?.displayName} ơi, hôm nay bạn đang nghĩ gì thế?`}
-                        className="flex-1 bg-transparent border-none text-slate-850 placeholder-slate-400 focus:outline-none resize-none min-h-[80px] text-lg"
+                        className="flex-1 bg-transparent border-none text-slate-850 placeholder-slate-400 focus:outline-none resize-none min-h-[70px] text-base sm:text-lg"
                     />
                 </div>
 
@@ -136,7 +136,7 @@ const CreatePost = ({ onPostCreated }) => {
                     </div>
                 )}
 
-                <div className="flex items-center justify-between pt-4 border-t border-slate-100">
+                <div className="flex items-center justify-between pt-3 sm:pt-4 border-t border-slate-100">
                     {/* Nút chọn Ảnh & Video */}
                     <input
                         type="file"
@@ -150,10 +150,10 @@ const CreatePost = ({ onPostCreated }) => {
                         type="button"
                         onClick={() => fileInputRef.current?.click()}
                         disabled={isSubmitting}
-                        className="flex items-center space-x-2 px-4 py-2 bg-slate-50 hover:bg-slate-100 rounded-xl text-slate-650 border border-slate-200 transition cursor-pointer disabled:opacity-50 text-sm font-medium"
+                        className="flex items-center space-x-1.5 sm:space-x-2 px-3 sm:px-4 py-2 bg-slate-50 hover:bg-slate-100 rounded-xl text-slate-650 border border-slate-200 transition cursor-pointer disabled:opacity-50 text-xs sm:text-sm font-medium"
                     >
-                        <Image className="w-5 h-5 text-emerald-500" />
-                        <Video className="w-5 h-5 text-blue-600" />
+                        <Image className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-500" />
+                        <Video className="w-4 h-4 sm:w-5 sm:h-5 text-blue-600" />
                         <span>Ảnh / Video</span>
                     </button>
 
@@ -161,7 +161,7 @@ const CreatePost = ({ onPostCreated }) => {
                     <button
                         type="submit"
                         disabled={isSubmitting || (!content.trim() && selectedFiles.length === 0)}
-                        className="flex items-center space-x-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 rounded-xl text-white font-semibold transition duration-200 transform active:scale-95 disabled:opacity-50 cursor-pointer text-sm shadow-md shadow-blue-600/10"
+                        className="flex items-center space-x-1.5 sm:space-x-2 px-4 sm:px-5 py-2 sm:py-2.5 bg-blue-600 hover:bg-blue-700 rounded-xl text-white font-semibold transition duration-200 transform active:scale-95 disabled:opacity-50 cursor-pointer text-xs sm:text-sm shadow-md shadow-blue-600/10"
                     >
                         {isSubmitting ? (
                             <Loader className="w-4 h-4 animate-spin" />

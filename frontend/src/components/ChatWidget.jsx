@@ -241,9 +241,9 @@ const ChatWidget = () => {
             </aside>
 
             {/* Container chứa các ô chat nổi ở góc dưới bên phải màn hình */}
-            <div className="fixed bottom-0 right-72 z-40 flex items-end space-x-4 pointer-events-none">
+            <div className="fixed bottom-16 sm:bottom-0 right-0 sm:right-6 lg:right-72 inset-x-0 sm:inset-x-auto z-40 flex items-end justify-end space-x-4 pointer-events-none px-2 sm:px-0">
                 {openChats.map(conv => (
-                    <div key={conv._id || conv.id} className="pointer-events-auto">
+                    <div key={conv._id || conv.id} className="pointer-events-auto w-full sm:w-auto">
                         {/* Map trạng thái online vào cuộc trò chuyện */}
                         <ChatBox
                             conversation={{
