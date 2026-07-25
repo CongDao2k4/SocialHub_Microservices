@@ -124,10 +124,11 @@ const resolveUrls = (obj) => {
                     if (val.startsWith("blob:")) continue;
 
                     const getMediaBase = () => {
+                        // Media luôn đi qua Gateway: /api/media/file/... (KHÔNG strip /api)
                         const envMedia = import.meta.env.VITE_MEDIA_URL;
-                        if (envMedia) return envMedia.replace(/\/api$/, '');
-                        if (import.meta.env.DEV) return 'http://localhost:5005';
-                        return api.defaults.baseURL ? api.defaults.baseURL.replace(/\/api$/, '') : "";
+                        if (envMedia) return envMedia.replace(/\/$/, '');
+                        if (import.meta.env.DEV) return 'http://localhost:8080/api';
+                        return api.defaults.baseURL || "/api";
                     };
 
                     let resolvedUrl = val;
