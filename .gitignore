@@ -117,3 +117,4 @@ k8s/secrets.yaml
 k8s/turnserver.conf
 
 cloudfare/
+key_oracle/
