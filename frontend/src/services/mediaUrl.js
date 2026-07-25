@@ -1,11 +1,15 @@
 import api from "./api";
 
-const MEDIA_BASE = import.meta.env.VITE_MEDIA_URL
-  ? import.meta.env.VITE_MEDIA_URL.replace(/\/api$/, '')
-  : (import.meta.env.DEV ? 'http://localhost:5005' : null);
+const getMediaBase = () => {
+  // Media luôn đi qua Gateway: /api/media/file/... (KHÔNG strip /api)
+  const envMedia = import.meta.env.VITE_MEDIA_URL;
+  if (envMedia) return envMedia.replace(/\/$/, '');
+  if (import.meta.env.DEV) return 'http://localhost:8080/api';
+  return api.defaults.baseURL || "/api";
+};
 
 export const getMediaBaseUrl = () => {
-  return MEDIA_BASE || (api.defaults.baseURL ? api.defaults.baseURL.replace(/\/api$/, '') : "");
+  return getMediaBase();
 };
 
 export const getMediaFileUrl = (mediaId, variant = "medium") => {
