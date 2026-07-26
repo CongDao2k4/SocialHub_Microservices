@@ -104,35 +104,20 @@ const HlsVideoPlayer = ({
     };
 
     const waitForPlaylistReady = async () => {
-      for (let attempt = 0; attempt <= MAX_PLAYLIST_RETRIES; attempt++) {
-        if (!isSubscribed) return false;
+      if (!isSubscribed) return false;
 
-        try {
-          const response = await fetch(`${hlsMasterUrl}?t=${Date.now()}`, {
-            method: "GET",
-            headers: buildMediaHeaders(),
-            cache: "no-store"
-          });
+      try {
+        const response = await fetch(`${hlsMasterUrl}?t=${Date.now()}`, {
+          method: "GET",
+          headers: buildMediaHeaders(),
+          cache: "no-store"
+        });
 
-          if (response.ok) {
-            return true;
-          }
-
-          if (response.status !== 404) {
-            throw new Error(`Unexpected playlist status ${response.status}`);
-          }
-        } catch (err) {
-          if (attempt === MAX_PLAYLIST_RETRIES) {
-            throw err;
-          }
+        if (response.ok) {
+          return true;
         }
-
-        if (attempt < MAX_PLAYLIST_RETRIES) {
-          setLoadingText(`Dang xu ly video ngam (${(attempt + 1) * 2.5}s)...`);
-          await new Promise((resolve) => {
-            retryTimer = setTimeout(resolve, PLAYLIST_RETRY_DELAY_MS);
-          });
-        }
+      } catch (err) {
+        console.warn(`[HLS Player] Check playlist error:`, err.message);
       }
 
       return false;
@@ -141,10 +126,27 @@ const HlsVideoPlayer = ({
     const loadFallbackMp4 = async () => {
       if (!isSubscribed) return;
 
+      const mp4Url = getMediaFileUrl(mediaId);
+      const isNgrok = mp4Url.includes("ngrok");
+
+      if (!isNgrok) {
+        // Direct streaming for local/non-ngrok environments via HTTP range requests
+        setFallbackBlobUrl(null);
+        videoNode.src = mp4Url;
+        videoNode.onloadedmetadata = (e) => {
+          if (!isSubscribed) return;
+          setIsLoading(false);
+          syncVideoMetrics();
+          if (parentOnLoadedMetadata) parentOnLoadedMetadata(e);
+          maybeAutoplay();
+        };
+        return;
+      }
+
       setLoadingText("Dang tai tep MP4 du phong...");
 
       try {
-        const response = await fetch(getMediaFileUrl(mediaId), {
+        const response = await fetch(mp4Url, {
           headers: buildMediaHeaders(),
           cache: "no-store"
         });

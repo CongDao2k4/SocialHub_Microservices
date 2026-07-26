@@ -181,11 +181,11 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '0.5'
-          memory: 384M
+          cpus: '1.5'
+          memory: 1024M
         reservations:
-          cpus: '0.1'
-          memory: 192M
+          cpus: '0.3'
+          memory: 256M
     env_file:
       - .env
     environment:
