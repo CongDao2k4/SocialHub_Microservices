@@ -27,18 +27,13 @@ Trang thai code hien tai:
 - khi upload video qua `POST /media/upload`, service se:
   1. upload file video goc len MinIO
   2. tao record MongoDB
-  3. `await` FFmpeg transcode sang HLS
-  4. upload `index.m3u8` va cac file `.ts` len MinIO
-  5. cap nhat `hlsReady=true`
-  6. chi sau do moi tra `201`
-
-Dieu nay co nghia la luong reel moi upload xong se khong con gap `index.m3u8 404` do playlist chua san sang.
+  3. Khoi chay tien trinh FFmpeg transcode sang HLS bat dong bo (chay ngam)
+  4. Tra phan hoi `201 Created` ngay lap tuc cho client (`hlsReady: false` luc dau)
+  5. FFmpeg chay ngam se transcode video, upload `index.m3u8` va cac file `.ts` len MinIO
+  6. Cap nhat `hlsReady=true` va `hlsMasterKey` vao MongoDB sau khi hoan thanh.
 
 Neu HLS fail:
-
-- request upload se fail
-- file goc trong MinIO se duoc xoa thu hoi
-- record MongoDB se bi xoa de tranh media "nua song nua chet"
+- Record video van duoc giu lai, nguoi dung xem bang video MP4 goc fallback (khong xoa record/file de giu trai nghiem phat video lien tuc).
 
 ## API endpoints
 
@@ -65,8 +60,8 @@ Neu HLS fail:
   - JPG / PNG / WEBP duoc nen thanh 3 bien the
 - video:
   - upload file goc
-  - transcode HLS dong bo
-  - response chi tra ve sau khi `hlsReady=true`
+  - transcode HLS bat dong bo (chay ngam, khong block request)
+  - response tra ve ngay lap tuc sau khi luu video goc (`hlsReady: false`)
 
 ### `GET /media/file/:id`
 
@@ -89,6 +84,7 @@ Neu HLS fail:
 
 - public
 - stream tung HLS segment `.ts`
+- Duoc toi uu bang bo nho dem in-memory cache `mediaOwnerCache` de bo qua truy van database `Media.findById(id)` khi lay tu phan doan thu 2 tro di, giam thieu tối đa do tre cho client khi xem video HLS.
 
 ## Luu tru
 

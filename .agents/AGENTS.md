@@ -47,3 +47,24 @@ Khi chạy trên môi trường Production (GKE), Google Cloud tính phí theo d
       effect: "NoSchedule"
     ```
 *   **Bật Extension Postgres UUID**: Khi tạo database mới trên Cloud SQL, bắt buộc phải kích hoạt extension `uuid-ossp` thông qua client tạm thời trước khi khởi động `post-service` để tránh lỗi thiếu hàm `uuid_generate_v4()`.
+
+---
+
+## 🚀 5. Quy tắc Bảo vệ Các Tối ưu hóa Xử lý Media (Upload & Video Playback)
+
+Tất cả các tối ưu hóa dưới đây là bắt buộc để duy trì tính năng upload video nhanh và xem video mượt mà (không gián đoạn) trên môi trường Local cũng như Product (như Vercel). Các tác vụ AI/coding agent sau này **TUYỆT ĐỐI không được sửa đổi, xóa bỏ hoặc làm mất hiệu lực** của các phần mã nguồn này:
+
+*   **Không block request khi upload video (Asynchronous Transcoding)**: 
+    *   Trong [media.service.js](/services/media-service/src/services/media.service.js) hàm `uploadMedia`, quá trình chuyển mã video sang định dạng HLS (`hlsService.processVideoToHLS`) phải luôn được chạy bất đồng bộ (background process/job). 
+    *   API phải trả về mã phản hồi `201 Created` ngay lập tức sau khi lưu trữ thành công file video gốc lên MinIO. Nghiêm cấm sử dụng từ khóa `await` chặn dòng xử lý này.
+*   **Cấm truy vấn cơ sở dữ liệu lặp lại cho từng HLS segment (Media Owner Cache)**:
+    *   Trong [media.service.js](/services/media-service/src/services/media.service.js) hàm `getHlsSegment`, bắt buộc phải sử dụng bộ nhớ đệm trong RAM (`mediaOwnerCache` Map) để lưu trữ cặp `mediaId -> uploadedBy` nhằm lấy đường dẫn MinIO cho các file phân đoạn `.ts`. 
+    *   Chỉ truy vấn MongoDB khi cache bị hụt (miss). Nghiêm cấm xóa bộ nhớ đệm này để tránh làm quá tải database và gây lag/buffer giật cục cho video HLS.
+*   **Tối ưu hóa Reels Lazy-Loading & Socket Release (Client-Side)**:
+    *   Trong [HlsVideoPlayer.jsx](/frontend/src/components/HlsVideoPlayer.jsx), chỉ được phép nạp danh sách phát HLS (playlist) và phân đoạn `.ts` khi Reel card đang thực sự được hiển thị active (`isActive === true` và `isReel === true`).
+    *   Khi người dùng cuộn Reel sang trang khác hoặc khi Player bị unmount, bắt buộc phải dừng video, hủy thực thể Hls (`hls.destroy()`), gỡ bỏ thuộc tính `src` và gọi `videoNode.load()` để buộc trình duyệt giải phóng bộ nhớ đệm và đóng kết nối HTTP. Điều này giúp ngăn chặn cạn kiệt socket connection (cổ chai tối đa 6 socket của trình duyệt).
+*   **Không download toàn bộ file MP4 thành Blob ở Local**:
+    *   Trong [HlsVideoPlayer.jsx](/frontend/src/components/HlsVideoPlayer.jsx) hàm `loadFallbackMp4`, đối với các kết nối không chứa `ngrok` (như localhost), bắt buộc phải gán trực tiếp URL video gốc vào `video.src` để trình duyệt tự động stream thông qua HTTP Range requests thay vì tải toàn bộ file về dưới dạng Blob vào RAM.
+*   **Cấu hình CORS Range trên Gateway**:
+    *   Trong Gateway [app.js](/gateway/src/app.js) phần cấu hình CORS, bắt buộc phải cho phép header `Range` và expose các header `Accept-Ranges`, `Content-Range`. Nghiêm cấm xóa các cấu hình này vì sẽ làm lỗi/chặn trình duyệt từ origin ngoài (như Vercel) stream video.
+
