@@ -31,13 +31,15 @@ export const mediaService = {
         objectKey = `${userId}/${baseId}_original.webp`;
         const variantEntries = [
           { name: 'original', buffer: processed.original, key: objectKey },
-          { name: 'medium',   buffer: processed.medium,   key: `${userId}/${baseId}_medium.webp` },
-          { name: 'thumbnail',buffer: processed.thumbnail, key: `${userId}/${baseId}_thumbnail.webp` },
+          { name: 'medium', buffer: processed.medium, key: `${userId}/${baseId}_medium.webp` },
+          { name: 'thumbnail', buffer: processed.thumbnail, key: `${userId}/${baseId}_thumbnail.webp` }
         ];
+
         for (const item of variantEntries) {
           await minioService.uploadFile(item.key, item.buffer, 'image/webp', item.buffer.length);
           variants.set(item.name, item.key);
         }
+
         compressedSize = processed.original.length + processed.medium.length + processed.thumbnail.length;
         outputFormat = 'webp';
       } else {
@@ -51,19 +53,29 @@ export const mediaService = {
       originalName: file.originalname,
       mimeType: file.mimetype,
       size: file.size,
-      objectKey: objectKey,
+      objectKey,
       uploadedBy: userId,
       compressedSize,
       compressionRatio: parseFloat((1 - compressedSize / file.size).toFixed(3)),
       format: outputFormat,
-      variants,
+      variants
     });
 
     if (isVideo) {
-      // Kích hoạt tiến trình cắt HLS ngầm
-      hlsService.processVideoToHLS(media._id.toString(), file.buffer, userId, ext).catch(err => {
-        console.error(`❌ Background HLS transcode failed for ${media._id}:`, err.message);
-      });
+      try {
+        const hlsResult = await hlsService.processVideoToHLS(media._id.toString(), file.buffer, userId, ext);
+        media.hlsReady = Boolean(hlsResult?.hlsReady);
+        media.hlsMasterKey = hlsResult?.hlsMasterKey || null;
+      } catch (err) {
+        try {
+          await minioService.deleteFile(media.objectKey);
+        } catch (cleanupErr) {
+          console.warn(`Failed to delete original video after HLS error for ${media._id}:`, cleanupErr.message);
+        }
+
+        await Media.findByIdAndDelete(media._id);
+        throw err;
+      }
     }
 
     return {
@@ -96,8 +108,8 @@ export const mediaService = {
       return vMap[key] || null;
     };
 
-    const variantKey = getVariantKey(media.variants, variant) 
-      || getVariantKey(media.variants, 'medium') 
+    const variantKey = getVariantKey(media.variants, variant)
+      || getVariantKey(media.variants, 'medium')
       || getVariantKey(media.variants, 'original');
 
     if (variantKey) {
@@ -105,13 +117,12 @@ export const mediaService = {
       targetMimeType = 'image/webp';
     }
 
-    // Lấy kích thước thực tế của file trong MinIO (không phải kích thước file gốc trước nén)
     let actualSize = null;
     try {
       const stat = await minioService.statFile(targetKey);
       actualSize = stat.size;
-    } catch (e) {
-      // Fallback: không set Content-Length nếu không lấy được stat
+    } catch {
+      // Leave Content-Length unset if MinIO stat fails.
     }
 
     const stream = await minioService.getFileStream(targetKey);
@@ -126,7 +137,6 @@ export const mediaService = {
     const media = await Media.findById(id);
     if (!media) throw new NotFoundError('Media not found');
 
-    // Trả về relative URL để đi qua proxy API Gateway
     const url = `/media/file/${media._id}`;
     const expiresAt = new Date(Date.now() + config.PRESIGNED_URL_TTL * 1000);
 
@@ -163,15 +173,20 @@ export const mediaService = {
         const media = await Media.findById(id);
         if (media) {
           const url = `/media/file/${media._id}`;
-          urls.push({ mediaId: id, url, expiresAt: new Date(Date.now() + config.PRESIGNED_URL_TTL * 1000) });
+          urls.push({
+            mediaId: id,
+            url,
+            expiresAt: new Date(Date.now() + config.PRESIGNED_URL_TTL * 1000)
+          });
         }
-      } catch (e) {
-        // Bỏ qua lỗi với từng ID đơn lẻ (ảnh bị xóa, v.v.)
+      } catch {
+        // Ignore per-item lookup errors.
       }
     }
+
     return urls;
   },
-  
+
   checkHealth: async () => {
     await minioService.checkHealth();
   },
@@ -181,7 +196,6 @@ export const mediaService = {
     if (!media) throw new NotFoundError('Media not found');
 
     if (!media.hlsReady || !media.hlsMasterKey) {
-      // Kích hoạt tự động tạo HLS ngầm cho video cũ chưa có HLS (nếu tiến trình chưa chạy)
       if (media.mimeType && media.mimeType.startsWith('video/') && !hlsService.isProcessing(media._id.toString())) {
         minioService.getFileStream(media.objectKey).then(async (stream) => {
           const chunks = [];
@@ -191,8 +205,8 @@ export const mediaService = {
           const fileBuffer = Buffer.concat(chunks);
           const ext = media.originalName?.split('.').pop() || 'mp4';
           await hlsService.processVideoToHLS(media._id.toString(), fileBuffer, media.uploadedBy, ext);
-        }).catch(err => {
-          console.warn(`⚠️ Lỗi tạo HLS ngầm cho video cũ ${id}:`, err.message);
+        }).catch((err) => {
+          console.warn(`Failed to generate HLS for legacy video ${id}:`, err.message);
         });
       }
       throw new NotFoundError('HLS playlist not ready yet');
