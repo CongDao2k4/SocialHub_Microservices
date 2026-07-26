@@ -15,7 +15,7 @@ const getApiUrl = (origin) => {
 
 const api = axios.create({
     baseURL: getApiUrl(currentOrigin),
-    timeout: 10000,
+    timeout: 30000,
     headers: {
         "Content-Type": "application/json",
         "ngrok-skip-browser-warning": "any-value"
@@ -97,8 +97,9 @@ api.interceptors.request.use(
         }
         config.headers["ngrok-skip-browser-warning"] = "any-value";
 
-        if (config.data instanceof FormData) {
+        if (config.data instanceof FormData || (config.url && config.url.includes("/media/upload"))) {
             delete config.headers["Content-Type"];
+            config.timeout = 0; // Disable timeout for uploads and video processing
         }
         return config;
     },
