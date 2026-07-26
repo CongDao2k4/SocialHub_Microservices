@@ -62,6 +62,12 @@ const HlsVideoPlayer = ({
   useEffect(() => {
     if (!mediaId) return;
 
+    // Lazy load: skip HLS initialization and video buffering for inactive reels
+    if (isReel && !isActive) {
+      setIsLoading(false);
+      return;
+    }
+
     setIsLoading(true);
     setLoadingText("Dang tai video...");
 
@@ -280,8 +286,15 @@ const HlsVideoPlayer = ({
       isSubscribed = false;
       if (retryTimer) clearTimeout(retryTimer);
       cleanupHls();
+      if (videoNode) {
+        videoNode.pause();
+        videoNode.removeAttribute('src'); // Remove src to immediately free resources and stop network requests
+        try {
+          videoNode.load(); // Force browser to clean media buffers and close socket
+        } catch (e) {}
+      }
     };
-  }, [mediaId]);
+  }, [mediaId, isActive, isReel]);
 
   useEffect(() => {
     if (!isReel) return;
