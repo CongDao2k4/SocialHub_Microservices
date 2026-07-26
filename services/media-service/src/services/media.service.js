@@ -6,6 +6,9 @@ import { Media } from '../models/media.model.js';
 import { config } from '../config/index.js';
 import { BadRequestError, NotFoundError, ForbiddenError } from '../utils/error.js';
 
+// Cache to map mediaId -> uploadedBy to avoid redundant DB queries for HLS segments
+const mediaOwnerCache = new Map();
+
 export const mediaService = {
   uploadMedia: async (file, userId, fileCategory) => {
     if (!file) throw new BadRequestError('No file uploaded');
@@ -62,20 +65,15 @@ export const mediaService = {
     });
 
     if (isVideo) {
-      try {
-        const hlsResult = await hlsService.processVideoToHLS(media._id.toString(), file.buffer, userId, ext);
-        media.hlsReady = Boolean(hlsResult?.hlsReady);
-        media.hlsMasterKey = hlsResult?.hlsMasterKey || null;
-      } catch (err) {
-        try {
-          await minioService.deleteFile(media.objectKey);
-        } catch (cleanupErr) {
-          console.warn(`Failed to delete original video after HLS error for ${media._id}:`, cleanupErr.message);
-        }
-
-        await Media.findByIdAndDelete(media._id);
-        throw err;
-      }
+      // Run HLS transcoding in the background (asynchronously)
+      hlsService.processVideoToHLS(media._id.toString(), file.buffer, userId, ext)
+        .then((hlsResult) => {
+          console.log(`[HLS] Background transcoding completed successfully for mediaId=${media._id}`);
+        })
+        .catch((err) => {
+          console.error(`[HLS] Background transcoding failed for mediaId=${media._id}:`, err.message);
+          // We do not delete the media or files here; the raw video remains playable as fallback.
+        });
     }
 
     return {
@@ -195,6 +193,10 @@ export const mediaService = {
     const media = await Media.findById(id);
     if (!media) throw new NotFoundError('Media not found');
 
+    if (media.uploadedBy) {
+      mediaOwnerCache.set(id, media.uploadedBy);
+    }
+
     if (!media.hlsReady || !media.hlsMasterKey) {
       if (media.mimeType && media.mimeType.startsWith('video/') && !hlsService.isProcessing(media._id.toString())) {
         minioService.getFileStream(media.objectKey).then(async (stream) => {
@@ -220,10 +222,15 @@ export const mediaService = {
   },
 
   getHlsSegment: async (id, segmentName) => {
-    const media = await Media.findById(id);
-    if (!media) throw new NotFoundError('Media not found');
+    let uploadedBy = mediaOwnerCache.get(id);
+    if (!uploadedBy) {
+      const media = await Media.findById(id);
+      if (!media) throw new NotFoundError('Media not found');
+      uploadedBy = media.uploadedBy;
+      mediaOwnerCache.set(id, uploadedBy);
+    }
 
-    const segmentKey = `${media.uploadedBy}/hls/${id}/${segmentName}`;
+    const segmentKey = `${uploadedBy}/hls/${id}/${segmentName}`;
     const stream = await minioService.getFileStream(segmentKey);
     return {
       stream,
