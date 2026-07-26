@@ -23,9 +23,10 @@ app.use(cors({
     'Authorization',
     'ngrok-skip-browser-warning',
     'x-user-id',
-    'x-requested-with'
+    'x-requested-with',
+    'Range'
   ],
-  exposedHeaders: ['Content-Length', 'Content-Type'],
+  exposedHeaders: ['Content-Length', 'Content-Type', 'Accept-Ranges', 'Content-Range'],
   credentials: false
 }));
 
