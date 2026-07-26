@@ -1,5 +1,6 @@
 import axios from 'axios';
 import CircuitBreaker from 'opossum';
+import { pipeline } from 'node:stream/promises';
 import {config} from '../config/index.js';
 
 // Default options for circuit breakers
@@ -68,26 +69,27 @@ async function proxyRequest(serviceName, baseUrl, req, res, targetPath) {
   });
 
   res.status(response.status);
-  response.data.pipe(res);
 
-  return new Promise((resolve, reject) => {
-    response.data.on('end', resolve);
-    response.data.on('error', (err) => {
-      if (err.message === 'aborted' || err.code === 'ECONNRESET' || req.aborted) {
-        return resolve();
-      }
-      reject(err);
-    });
-    res.on('finish', resolve);
-    res.on('close', resolve);
-    req.on('aborted', resolve);
+  req.on('aborted', () => {
+    if (typeof response.data.destroy === 'function') {
+      response.data.destroy();
+    }
   });
+
+  try {
+    await pipeline(response.data, res);
+  } catch (err) {
+    if (err.message === 'aborted' || err.code === 'ECONNRESET' || err.code === 'ERR_STREAM_PREMATURE_CLOSE' || req.aborted) {
+      return;
+    }
+    throw err;
+  }
 }
 
 // Default options for circuit breakers
 const mediaBreakerOptions = {
   ...breakerOptions,
-  timeout: parseInt(process.env.MEDIA_CIRCUIT_BREAKER_TIMEOUT, 10) || 60000, // 60s for media transfer
+  timeout: parseInt(process.env.MEDIA_CIRCUIT_BREAKER_TIMEOUT, 10) || 180000, // 3m for upload + HLS processing
   errorFilter: (err) => {
     if (!err) return false;
     const msg = String(err.message || '').toLowerCase();

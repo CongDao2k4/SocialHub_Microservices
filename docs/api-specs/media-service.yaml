@@ -1,70 +1,57 @@
-# =======================================================================
-# media-service — Complete Service Contract
-# =======================================================================
-# Bounded Context: Media
-# Responsibility: File upload to MinIO, presigned URL generation, media metadata
-# Storage: MinIO (S3-compatible object storage)
-# Security: Presigned URLs with TTL (15 min) — no direct MinIO access
-# =======================================================================
-
 openapi: 3.0.3
 
 info:
-  title: media-service — Media Management
+  title: media-service
+  version: 1.1.0
   description: |
-    Manages media file lifecycle: upload images to MinIO (S3-compatible storage),
-    store metadata, and generate time-limited presigned URLs for secure access.
+    Media service for SocialHub.
 
-    **Security Model:**
-    - MinIO bucket is PRIVATE (no public access)
-    - All access requires JWT authentication via Gateway
-    - Files are served via presigned URLs with 15-minute TTL
-    - After TTL expires, the URL returns 403 Forbidden
-    - Clients must request a new presigned URL to access the file again
-  version: 1.0.0
+    Covers:
+    - image upload and image variants
+    - video upload
+    - synchronous HLS generation for new video uploads
+    - public file stream and public HLS stream through Gateway
+    - metadata and delete operations
 
 servers:
   - url: http://localhost:5005
-    description: Local development (direct)
+    description: Direct local access
   - url: http://localhost:8080/api
-    description: Local development (via API Gateway)
+    description: Access through Gateway
 
 paths:
   /health:
     get:
-      summary: Health check
-      operationId: healthCheck
       tags: [System]
+      summary: Health check
       responses:
         '200':
-          description: Service is healthy
+          description: Service healthy
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/HealthResponse'
 
-  # ── Upload ───────────────────────────────────────────────────────────
-
   /media/upload:
     post:
-      summary: Upload a media file
-      operationId: uploadMedia
       tags: [Media]
+      summary: Upload image or video
       security:
         - bearerAuth: []
       description: |
-        Uploads an image file to MinIO private bucket.
+        Uploads an image or video.
 
-        **Processing steps:**
-        1. Validate JWT (user must be authenticated)
-        2. Validate file type (only jpg, jpeg, png, gif, webp allowed)
-        3. Validate file size (max 10MB)
-        4. Generate unique filename: `{userId}/{uuid}.{ext}`
-        5. Upload to MinIO private bucket via S3 PutObject
-        6. Save metadata to database (id, originalName, mimeType, size, objectKey, uploadedBy)
-        7. Return mediaId for use in posts, profiles, messages
+        Image flow:
+        - uploads to MinIO
+        - may generate WebP variants: original, medium, thumbnail
 
-        Derived from: DDD 2.3 command "UploadMedia"
+        Video flow:
+        - uploads original file to MinIO
+        - transcodes to HLS using FFmpeg
+        - uploads `index.m3u8` and `.ts` segments
+        - only returns `201` after `hlsReady=true`
+
+        This means a newly uploaded reel video is ready for HLS playback as soon as upload succeeds.
       requestBody:
         required: true
         content:
@@ -76,183 +63,28 @@ paths:
                 file:
                   type: string
                   format: binary
-                  description: Image file (jpg, png, gif, webp — max 10MB)
       responses:
         '201':
-          description: File uploaded successfully
+          description: Upload completed
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/MediaUploadResponse'
         '400':
-          description: Invalid file type (only jpg, png, gif, webp allowed)
+          description: Invalid file or payload
         '401':
-          description: Not authenticated
+          description: Unauthorized
         '413':
-          description: File too large (max 10MB)
-
-  # ── Media Access ────────────────────────────────────────────────────
-
-  /media/{id}:
-    get:
-      summary: Get media metadata
-      operationId: getMediaInfo
-      tags: [Media]
-      security:
-        - bearerAuth: []
-      description: Returns metadata for a media file (without the actual file content).
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: string
-            format: uuid
-      responses:
-        '200':
-          description: Media metadata
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/MediaInfo'
-        '404':
-          description: Media not found
-
-    delete:
-      summary: Delete a media file
-      operationId: deleteMedia
-      tags: [Media]
-      security:
-        - bearerAuth: []
-      description: |
-        Deletes a media file from MinIO and removes its metadata.
-        Only the uploader can delete their own files.
-        Derived from: DDD 2.3 command "DeleteMedia"
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: string
-            format: uuid
-      responses:
-        '200':
-          description: Media deleted
-        '403':
-          description: Only the uploader can delete
-        '404':
-          description: Media not found
-
-  /media/file/{id}:
-    get:
-      summary: Stream binary media file content
-      operationId: streamMediaFile
-      tags: [Media]
-      description: |
-        Streams the binary media file content with immutable caching headers.
-        Supports rendering compressed WebP image variants (thumbnail, medium, original).
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: string
-            format: uuid
-        - name: variant
-          in: query
-          required: false
-          schema:
-            type: string
-            enum: [thumbnail, medium, original]
-            default: medium
-          description: Image variant size (thumbnail = 200px, medium = 800px, original = 1920px). Falls back to original/raw file if variant does not exist.
-      responses:
-        '200':
-          description: Binary file stream
-          headers:
-            Cache-Control:
-              schema:
-                type: string
-                example: public, max-age=31536000, immutable
-            ETag:
-              schema:
-                type: string
-                example: '"65f12345-medium"'
-          content:
-            image/webp:
-              schema:
-                type: string
-                format: binary
-            image/jpeg:
-              schema:
-                type: string
-                format: binary
-            video/mp4:
-              schema:
-                type: string
-                format: binary
-        '404':
-          description: Media file not found
-
-  /media/{id}/url:
-    get:
-      summary: Get presigned URL for a media file
-      operationId: getPresignedUrl
-      tags: [Media]
-      security:
-        - bearerAuth: []
-      description: |
-        Generates a time-limited presigned URL for direct download from MinIO.
-
-        **Security flow:**
-        1. Client calls this endpoint with JWT (via Gateway)
-        2. Service validates JWT and checks access rights
-        3. Generates presigned URL from MinIO with TTL = 15 minutes
-        4. Returns the presigned URL + expiry timestamp
-        5. Client uses the presigned URL to download directly from MinIO
-        6. No auth header needed for presigned URL download
-        7. After 15 minutes, the presigned URL expires → 403
-
-        **Access control:**
-        - Media owner always has access
-        - Other users have access if the media is attached to:
-          - A post they can see (public, or friends-only from a friend)
-          - A conversation/group they are a member of
-          - A user profile they can view
-
-        Derived from: DDD 2.7 Flow 5 (Presigned URL Security)
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: string
-            format: uuid
-      responses:
-        '200':
-          description: Presigned URL generated
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/PresignedUrlResponse'
-        '403':
-          description: No access to this media
-        '404':
-          description: Media not found
-
-  # ── Batch Operations ────────────────────────────────────────────────
+          description: File too large
+        '500':
+          description: Upload or HLS processing failed
 
   /media/batch-urls:
     post:
-      summary: Get presigned URLs for multiple media files
-      operationId: batchGetPresignedUrls
       tags: [Media]
+      summary: Get proxy URLs for multiple media IDs
       security:
         - bearerAuth: []
-      description: |
-        Generates presigned URLs for multiple media files in a single request.
-        Useful for loading posts with multiple images or feed rendering.
-        Each URL has the same 15-minute TTL.
       requestBody:
         required: true
         content:
@@ -265,24 +97,171 @@ paths:
                   type: array
                   items:
                     type: string
-                    format: uuid
-                  maxItems: 50
       responses:
         '200':
-          description: Presigned URLs
+          description: URL batch returned
+
+  /media/{id}:
+    get:
+      tags: [Media]
+      summary: Get media metadata
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Media metadata
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  urls:
-                    type: array
-                    items:
-                      $ref: '#/components/schemas/PresignedUrlResponse'
+                $ref: '#/components/schemas/MediaInfo'
+        '404':
+          description: Media not found
 
-# =======================================================================
-# Shared Schemas
-# =======================================================================
+    delete:
+      tags: [Media]
+      summary: Delete media
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Media deleted
+        '403':
+          description: Only owner can delete
+        '404':
+          description: Media not found
+
+  /media/file/{id}:
+    get:
+      tags: [Media]
+      summary: Stream file or fallback raw media
+      description: |
+        Public binary stream endpoint.
+
+        For images:
+        - supports `variant=thumbnail|medium|original`
+
+        For video:
+        - returns the original uploaded file
+        - often used as fallback MP4/raw stream when HLS is not used on client
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+        - in: query
+          name: variant
+          schema:
+            type: string
+            enum: [thumbnail, medium, original]
+            default: medium
+      responses:
+        '200':
+          description: Binary stream
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+                example: public, max-age=31536000, immutable
+            ETag:
+              schema:
+                type: string
+                example: '"mediaId-medium"'
+        '404':
+          description: Media not found
+
+  /media/hls/{id}/index.m3u8:
+    get:
+      tags: [HLS]
+      summary: Stream HLS playlist
+      description: |
+        Public HLS playlist endpoint for video playback.
+
+        For newly uploaded videos, playlist should already be ready when upload succeeds.
+        For legacy videos without HLS, service may trigger HLS generation on demand.
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: HLS playlist stream
+          content:
+            application/vnd.apple.mpegurl:
+              schema:
+                type: string
+                format: binary
+        '404':
+          description: Playlist not found or not ready
+
+  /media/hls/{id}/{segment}:
+    get:
+      tags: [HLS]
+      summary: Stream HLS segment
+      description: Public HLS segment `.ts` stream
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: segment
+          required: true
+          schema:
+            type: string
+            example: segment_000.ts
+      responses:
+        '200':
+          description: HLS segment stream
+          content:
+            video/mp2t:
+              schema:
+                type: string
+                format: binary
+        '404':
+          description: Segment not found
+
+  /media/{id}/url:
+    get:
+      tags: [Media]
+      summary: Get proxy URL for media
+      security:
+        - bearerAuth: []
+      description: |
+        Returns a relative proxy URL, not a direct MinIO presigned URL.
+
+        Current implementation returns:
+        - `/media/file/:id`
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Relative proxy URL
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProxyUrlResponse'
+        '404':
+          description: Media not found
 
 components:
   securitySchemes:
@@ -304,64 +283,70 @@ components:
       properties:
         id:
           type: string
-          format: uuid
-          description: Unique media ID — use this in posts, profiles, messages
         originalName:
           type: string
-          example: avatar.jpg
         mimeType:
           type: string
-          example: image/jpeg
         size:
           type: integer
-          description: File size in bytes
-          example: 2048576
         uploadedBy:
           type: string
-          format: uuid
         createdAt:
           type: string
           format: date-time
+        hlsReady:
+          type: boolean
 
     MediaInfo:
       type: object
       properties:
-        id:
+        _id:
           type: string
-          format: uuid
         originalName:
           type: string
         mimeType:
           type: string
         size:
           type: integer
-          description: File size in bytes
+        objectKey:
+          type: string
         uploadedBy:
           type: string
-          format: uuid
+        compressedSize:
+          type: integer
+          nullable: true
+        compressionRatio:
+          type: number
+          nullable: true
+        format:
+          type: string
+          nullable: true
+        hlsReady:
+          type: boolean
+        hlsMasterKey:
+          type: string
+          nullable: true
+        variants:
+          type: object
+          additionalProperties:
+            type: string
         createdAt:
           type: string
           format: date-time
+        updatedAt:
+          type: string
+          format: date-time
 
-    PresignedUrlResponse:
+    ProxyUrlResponse:
       type: object
       properties:
         mediaId:
           type: string
-          format: uuid
         url:
           type: string
-          format: uri
-          description: |
-            Presigned URL for direct download from MinIO.
-            No authentication header needed — signature is embedded in URL params.
-            Example: https://minio:9000/socialhub-media/userId/uuid.jpg?X-Amz-Algorithm=...&X-Amz-Signature=...&X-Amz-Expires=900
-          example: "http://minio:9000/socialhub-media/abc/def.jpg?X-Amz-Signature=..."
+          example: /media/file/6a5c6a4f05b6f74886131477
         expiresAt:
           type: string
           format: date-time
-          description: Exact timestamp when this URL expires (15 minutes from generation)
         ttlSeconds:
           type: integer
-          description: TTL in seconds (900 = 15 minutes)
-          example: 900

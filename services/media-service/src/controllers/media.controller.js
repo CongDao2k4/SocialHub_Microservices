@@ -1,4 +1,31 @@
 import { mediaService } from '../services/media.service.js';
+import { pipeline } from 'node:stream/promises';
+
+const pipeStreamToResponse = async (req, res, stream, next) => {
+  try {
+    req.on('aborted', () => {
+      if (typeof stream.destroy === 'function') {
+        stream.destroy();
+      }
+    });
+
+    await pipeline(stream, res);
+  } catch (err) {
+    if (err.code === 'ECONNRESET' || err.code === 'ERR_STREAM_PREMATURE_CLOSE' || req.aborted) {
+      if (!res.writableEnded) {
+        res.destroy();
+      }
+      return;
+    }
+
+    if (res.headersSent) {
+      res.destroy(err);
+      return;
+    }
+
+    next(err);
+  }
+};
 
 export const mediaController = {
   uploadMedia: async (req, res, next) => {
@@ -44,8 +71,8 @@ export const mediaController = {
       }
       res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
       res.setHeader('ETag', `"${id}-${variant}"`);
-      
-      stream.pipe(res);
+
+      await pipeStreamToResponse(req, res, stream, next);
     } catch (err) {
       next(err);
     }
@@ -87,7 +114,7 @@ export const mediaController = {
       
       res.setHeader('Content-Type', mimeType);
       res.setHeader('Cache-Control', 'no-cache');
-      stream.pipe(res);
+      await pipeStreamToResponse(req, res, stream, next);
     } catch (err) {
       next(err);
     }
@@ -100,7 +127,7 @@ export const mediaController = {
       
       res.setHeader('Content-Type', mimeType);
       res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
-      stream.pipe(res);
+      await pipeStreamToResponse(req, res, stream, next);
     } catch (err) {
       next(err);
     }

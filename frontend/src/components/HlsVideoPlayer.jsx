@@ -1,14 +1,26 @@
-import {useEffect, useRef, useState} from "react";
+import { useEffect, useRef, useState } from "react";
 import Hls from "hls.js";
-import {Loader, Play, Pause, Volume2, VolumeX, Maximize, Minimize} from "lucide-react";
-import api from "../services/api";
-import { getMediaBaseUrl, getMediaFileUrl, getHlsUrl } from "../services/mediaUrl";
+import { Loader, Play, Pause, Volume2, VolumeX, Maximize, Minimize } from "lucide-react";
+import { getMediaFileUrl, getHlsUrl } from "../services/mediaUrl";
+
+const PLAYLIST_RETRY_DELAY_MS = 2500;
+const MAX_PLAYLIST_RETRIES = 12;
+const MAX_SEGMENT_RECOVERIES = 4;
 
 const formatTime = (seconds) => {
   if (!seconds || isNaN(seconds)) return "0:00";
   const mins = Math.floor(seconds / 60);
   const secs = Math.floor(seconds % 60);
-  return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+  return `${mins}:${secs < 10 ? "0" : ""}${secs}`;
+};
+
+const buildMediaHeaders = () => {
+  const headers = { "ngrok-skip-browser-warning": "any-value" };
+  const token = localStorage.getItem("accessToken");
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
+  return headers;
 };
 
 const HlsVideoPlayer = ({
@@ -20,7 +32,7 @@ const HlsVideoPlayer = ({
   loop = true,
   muted = false,
   isActive = false,
-  isReel = false, // Phân biệt nếu đây là màn hình Reels lướt dọc
+  isReel = false,
   onPlaySuccess,
   onPlayError,
   onTimeUpdate: parentOnTimeUpdate,
@@ -36,14 +48,13 @@ const HlsVideoPlayer = ({
   const hlsRef = useRef(null);
 
   const [isLoading, setIsLoading] = useState(true);
-  const [loadingText, setLoadingText] = useState("Đang tải video...");
+  const [loadingText, setLoadingText] = useState("Dang tai video...");
   const [isPlaying, setIsPlaying] = useState(false);
   const [isMuted, setIsMuted] = useState(muted);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [fallbackBlobUrl, setFallbackBlobUrl] = useState(null);
-
   const [isLandscape, setIsLandscape] = useState(false);
 
   const effectivePoster = poster || (mediaId ? getMediaFileUrl(mediaId, "medium") : undefined);
@@ -52,189 +63,224 @@ const HlsVideoPlayer = ({
     if (!mediaId) return;
 
     setIsLoading(true);
-    setLoadingText("Đang tải video ...");
+    setLoadingText("Dang tai video...");
 
-    const mediaBaseURL = getMediaBaseUrl();
     const hlsMasterUrl = getHlsUrl(mediaId);
     const videoNode = videoRef.current;
     if (!videoNode) return;
 
     let isSubscribed = true;
     let retryTimer = null;
-    let retryCount = 0;
-    const MAX_RETRIES = 8; // Thử lại tối đa 8 lần (mỗi lần cách 2.5s = 20s cho FFmpeg chạy ngầm)
+    let segmentRecoveryCount = 0;
 
-    // Helper kích hoạt HLS qua Hls.js
-    const setupHlsJs = () => {
-      if (hlsRef.current) {
-        hlsRef.current.destroy();
-      }
-
-      const hls = new Hls({
-        maxBufferLength: 10,       // Preload 10s video vừa đủ xem mượt, giảm nghẽn băng thông 66%
-        maxMaxBufferLength: 20,
-        backBufferLength: 10,      // Giải phóng bộ nhớ video cũ đã xem qua
-        maxBufferHole: 0.5,        // Tự động nhảy qua khe hở buffer (< 0.5s)
-        maxSeekHole: 2,            // Cho phép tua mượt qua ranh giới giữa các segment
-        nudgeMaxRetry: 5,          // Tự động đẩy nhẹ playhead nếu video bị khựng ở mốc ranh giới
-        enableWorker: true,
-        autoStartLoad: true,
-        xhrSetup: (xhr) => {
-          xhr.setRequestHeader("ngrok-skip-browser-warning", "any-value");
-          const token = localStorage.getItem("accessToken");
-          if (token) {
-            xhr.setRequestHeader("Authorization", `Bearer ${token}`);
-          }
-        }
-      });
-
-      hlsRef.current = hls;
-
-      hls.loadSource(hlsMasterUrl);
-      hls.attachMedia(videoNode);
-
-      let manifestLoaded = false;
-
-      hls.on(Hls.Events.MANIFEST_PARSED, () => {
-        manifestLoaded = true;
-        if (isSubscribed) {
-          setIsLoading(false);
-          if (videoNode.duration && !isNaN(videoNode.duration)) {
-            setDuration(videoNode.duration);
-          }
-          if (videoNode.videoWidth && videoNode.videoHeight) {
-            setIsLandscape(videoNode.videoWidth > videoNode.videoHeight);
-          }
-          if (autoPlay || (isReel && isActive)) {
-            videoNode.play()
-              .then(() => {
-                setIsPlaying(true);
-                if (onPlaySuccess) onPlaySuccess();
-              })
-              .catch(err => {
-                setIsPlaying(false);
-                if (onPlayError) onPlayError(err);
-              });
-          }
-        }
-      });
-
-      hls.on(Hls.Events.ERROR, (event, data) => {
-        if (data.fatal) {
-          switch (data.type) {
-            case Hls.ErrorTypes.NETWORK_ERROR:
-              if (!manifestLoaded) {
-                // Nếu FFmpeg đang cắt ngầm (mất ~10s), thử lại tự động thay vì huỷ ngay
-                if (retryCount < MAX_RETRIES) {
-                  retryCount++;
-                  setLoadingText(`Đang xử lý video ngầm (${retryCount * 2.5}s)...`);
-                  retryTimer = setTimeout(() => {
-                    if (isSubscribed && hlsRef.current) {
-                      hlsRef.current.loadSource(hlsMasterUrl);
-                    }
-                  }, 2500);
-                } else {
-                  console.warn(`⚠️ [HLS] HLS chưa xong cho ${mediaId}. Chuyển MP4 dự phòng...`);
-                  hls.destroy();
-                  hlsRef.current = null;
-                  loadFallbackMp4();
-                }
-              } else {
-                console.warn("⚠️ [HLS] Mạng chập chờn khi tải segment, tự động nạp lại...");
-                hls.startLoad();
-              }
-              break;
-            case Hls.ErrorTypes.MEDIA_ERROR:
-              console.warn("⚠️ [HLS] Lỗi media, thử khôi phục...");
-              hls.recoverMediaError();
-              break;
-            default:
-              if (!manifestLoaded) {
-                hls.destroy();
-                hlsRef.current = null;
-                loadFallbackMp4();
-              } else {
-                hls.startLoad();
-              }
-              break;
-          }
-        }
-      });
-    };
-
-    // Fallback sang tải MP4 blob thông thường nếu HLS chưa xong
-    const loadFallbackMp4 = async () => {
-      if (!isSubscribed) return;
-      setLoadingText("Đang tải tệp MP4 dự phòng...");
-      try {
-        const fallbackUrl = getMediaFileUrl(mediaId);
-        const token = localStorage.getItem("accessToken");
-        const headers = { "ngrok-skip-browser-warning": "any-value" };
-        if (token) headers["Authorization"] = `Bearer ${token}`;
-        
-        const response = await fetch(fallbackUrl, { headers });
-        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-        const blobData = await response.blob();
-        if (isSubscribed) {
-          const blobUrl = URL.createObjectURL(blobData);
-          setFallbackBlobUrl(blobUrl);
-          if (videoNode) {
-            videoNode.src = blobUrl;
-            videoNode.onloadedmetadata = (e) => {
-              if (isSubscribed) {
-                setIsLoading(false);
-                if (videoNode.duration && !isNaN(videoNode.duration)) {
-                  setDuration(videoNode.duration);
-                }
-                if (videoNode.videoWidth && videoNode.videoHeight) {
-                  setIsLandscape(videoNode.videoWidth > videoNode.videoHeight);
-                }
-                if (parentOnLoadedMetadata) parentOnLoadedMetadata(e);
-                if (autoPlay || (isReel && isActive)) {
-                  videoNode.play()
-                    .then(() => {
-                      setIsPlaying(true);
-                      if (onPlaySuccess) onPlaySuccess();
-                    })
-                    .catch(err => {
-                      setIsPlaying(false);
-                      if (onPlayError) onPlayError(err);
-                    });
-                }
-              }
-            };
-          }
-        }
-      } catch (err) {
-        console.error(`❌ [HLS Fallback] Không thể tải MP4 fallback ${mediaId}:`, err.message);
-        if (isSubscribed) setIsLoading(false);
-      }
-    };
-
-    // Safari & iOS hỗ trợ HLS native
-    if (videoNode.canPlayType("application/vnd.apple.mpegurl")) {
-      videoNode.src = hlsMasterUrl;
-      setIsLoading(false);
-      if (autoPlay || (isReel && isActive)) {
-        videoNode.play().then(() => {setIsPlaying(true); if (onPlaySuccess) onPlaySuccess();}).catch(() => { });
-      }
-    } else if (Hls.isSupported()) {
-      setupHlsJs();
-    } else {
-      loadFallbackMp4();
-    }
-
-    return () => {
-      isSubscribed = false;
-      if (retryTimer) clearTimeout(retryTimer);
+    const cleanupHls = () => {
       if (hlsRef.current) {
         hlsRef.current.destroy();
         hlsRef.current = null;
       }
     };
+
+    const maybeAutoplay = () => {
+      if (!(autoPlay || (isReel && isActive))) return;
+
+      videoNode.play()
+        .then(() => {
+          setIsPlaying(true);
+          if (onPlaySuccess) onPlaySuccess();
+        })
+        .catch((err) => {
+          setIsPlaying(false);
+          if (onPlayError) onPlayError(err);
+        });
+    };
+
+    const syncVideoMetrics = () => {
+      if (videoNode.duration && !isNaN(videoNode.duration)) {
+        setDuration(videoNode.duration);
+      }
+      if (videoNode.videoWidth && videoNode.videoHeight) {
+        setIsLandscape(videoNode.videoWidth > videoNode.videoHeight);
+      }
+    };
+
+    const waitForPlaylistReady = async () => {
+      for (let attempt = 0; attempt <= MAX_PLAYLIST_RETRIES; attempt++) {
+        if (!isSubscribed) return false;
+
+        try {
+          const response = await fetch(`${hlsMasterUrl}?t=${Date.now()}`, {
+            method: "GET",
+            headers: buildMediaHeaders(),
+            cache: "no-store"
+          });
+
+          if (response.ok) {
+            return true;
+          }
+
+          if (response.status !== 404) {
+            throw new Error(`Unexpected playlist status ${response.status}`);
+          }
+        } catch (err) {
+          if (attempt === MAX_PLAYLIST_RETRIES) {
+            throw err;
+          }
+        }
+
+        if (attempt < MAX_PLAYLIST_RETRIES) {
+          setLoadingText(`Dang xu ly video ngam (${(attempt + 1) * 2.5}s)...`);
+          await new Promise((resolve) => {
+            retryTimer = setTimeout(resolve, PLAYLIST_RETRY_DELAY_MS);
+          });
+        }
+      }
+
+      return false;
+    };
+
+    const loadFallbackMp4 = async () => {
+      if (!isSubscribed) return;
+
+      setLoadingText("Dang tai tep MP4 du phong...");
+
+      try {
+        const response = await fetch(getMediaFileUrl(mediaId), {
+          headers: buildMediaHeaders(),
+          cache: "no-store"
+        });
+
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const blobData = await response.blob();
+        if (!isSubscribed) return;
+
+        const blobUrl = URL.createObjectURL(blobData);
+        setFallbackBlobUrl(blobUrl);
+        videoNode.src = blobUrl;
+        videoNode.onloadedmetadata = (e) => {
+          if (!isSubscribed) return;
+          setIsLoading(false);
+          syncVideoMetrics();
+          if (parentOnLoadedMetadata) parentOnLoadedMetadata(e);
+          maybeAutoplay();
+        };
+      } catch (err) {
+        console.error(`[HLS Fallback] Khong the tai MP4 fallback ${mediaId}:`, err.message);
+        if (isSubscribed) {
+          setIsLoading(false);
+        }
+      }
+    };
+
+    const setupHlsJs = () => {
+      cleanupHls();
+
+      const hls = new Hls({
+        maxBufferLength: 10,
+        maxMaxBufferLength: 20,
+        backBufferLength: 10,
+        maxBufferHole: 0.5,
+        maxSeekHole: 2,
+        nudgeMaxRetry: 5,
+        enableWorker: true,
+        autoStartLoad: true,
+        xhrSetup: (xhr) => {
+          const headers = buildMediaHeaders();
+          Object.entries(headers).forEach(([key, value]) => {
+            xhr.setRequestHeader(key, value);
+          });
+        }
+      });
+
+      hlsRef.current = hls;
+
+      let manifestLoaded = false;
+
+      hls.loadSource(`${hlsMasterUrl}?t=${Date.now()}`);
+      hls.attachMedia(videoNode);
+
+      hls.on(Hls.Events.MANIFEST_PARSED, () => {
+        manifestLoaded = true;
+        segmentRecoveryCount = 0;
+
+        if (!isSubscribed) return;
+        setIsLoading(false);
+        syncVideoMetrics();
+        maybeAutoplay();
+      });
+
+      hls.on(Hls.Events.ERROR, (_event, data) => {
+        if (!data.fatal) return;
+
+        switch (data.type) {
+          case Hls.ErrorTypes.NETWORK_ERROR:
+            if (!manifestLoaded) {
+              console.warn(`[HLS] Playlist loi sau khi da san sang cho ${mediaId}. Chuyen MP4 du phong...`);
+              cleanupHls();
+              loadFallbackMp4();
+            } else {
+              segmentRecoveryCount += 1;
+              if (segmentRecoveryCount <= MAX_SEGMENT_RECOVERIES) {
+                console.warn("[HLS] Mang chap chon khi tai segment, tu dong nap lai...");
+                hls.startLoad();
+              } else {
+                console.warn(`[HLS] Segment loi lap lai cho ${mediaId}. Chuyen MP4 du phong...`);
+                cleanupHls();
+                loadFallbackMp4();
+              }
+            }
+            break;
+          case Hls.ErrorTypes.MEDIA_ERROR:
+            console.warn("[HLS] Loi media, thu khoi phuc...");
+            hls.recoverMediaError();
+            break;
+          default:
+            cleanupHls();
+            loadFallbackMp4();
+            break;
+        }
+      });
+    };
+
+    const bootstrapPlayback = async () => {
+      try {
+        const playlistReady = await waitForPlaylistReady();
+
+        if (!playlistReady || !isSubscribed) {
+          await loadFallbackMp4();
+          return;
+        }
+
+        if (videoNode.canPlayType("application/vnd.apple.mpegurl")) {
+          videoNode.src = `${hlsMasterUrl}?t=${Date.now()}`;
+          setIsLoading(false);
+          maybeAutoplay();
+          return;
+        }
+
+        if (Hls.isSupported()) {
+          setupHlsJs();
+          return;
+        }
+
+        await loadFallbackMp4();
+      } catch (err) {
+        console.warn(`[HLS] Khong cho duoc playlist cho ${mediaId}. Chuyen MP4 du phong...`, err);
+        await loadFallbackMp4();
+      }
+    };
+
+    bootstrapPlayback();
+
+    return () => {
+      isSubscribed = false;
+      if (retryTimer) clearTimeout(retryTimer);
+      cleanupHls();
+    };
   }, [mediaId]);
 
-  // Điều khiển Tự động Play / Pause theo trạng thái cuộn viewport cho REELS
   useEffect(() => {
     if (!isReel) return;
     const videoNode = videoRef.current;
@@ -247,7 +293,7 @@ const HlsVideoPlayer = ({
             setIsPlaying(true);
             if (onPlaySuccess) onPlaySuccess();
           })
-          .catch(err => {
+          .catch((err) => {
             setIsPlaying(false);
             if (onPlayError) onPlayError(err);
           });
@@ -258,7 +304,6 @@ const HlsVideoPlayer = ({
     }
   }, [isReel, isActive]);
 
-  // Đồng bộ prop muted từ parent component (ví dụ Reels toggle sound)
   useEffect(() => {
     const videoNode = videoRef.current;
     if (videoNode) {
@@ -267,7 +312,6 @@ const HlsVideoPlayer = ({
     }
   }, [muted]);
 
-  // Clean up fallback blob URL khi unmount
   useEffect(() => {
     return () => {
       if (fallbackBlobUrl) {
@@ -276,7 +320,6 @@ const HlsVideoPlayer = ({
     };
   }, [fallbackBlobUrl]);
 
-  // Bật/tắt Play/Pause thủ công
   const handleTogglePlay = (e) => {
     if (e) e.stopPropagation();
     const videoNode = videoRef.current;
@@ -290,10 +333,10 @@ const HlsVideoPlayer = ({
         .then(() => setIsPlaying(true))
         .catch(() => setIsPlaying(false));
     }
+
     if (parentOnClick) parentOnClick(e);
   };
 
-  // Tua video khi tua bằng thanh Progress Bar
   const handleSeek = (e) => {
     e.stopPropagation();
     const videoNode = videoRef.current;
@@ -309,7 +352,6 @@ const HlsVideoPlayer = ({
     setCurrentTime(newTime);
   };
 
-  // Bật/tắt tiếng
   const handleToggleMute = (e) => {
     e.stopPropagation();
     const videoNode = videoRef.current;
@@ -318,16 +360,15 @@ const HlsVideoPlayer = ({
     setIsMuted(!isMuted);
   };
 
-  // Bật/tắt Toàn màn hình
   const handleToggleFullscreen = (e) => {
     e.stopPropagation();
     const targetNode = containerRef.current || videoRef.current;
     if (!targetNode) return;
 
     if (!document.fullscreenElement) {
-      targetNode.requestFullscreen().then(() => setIsFullscreen(true)).catch(() => { });
+      targetNode.requestFullscreen().then(() => setIsFullscreen(true)).catch(() => {});
     } else {
-      document.exitFullscreen().then(() => setIsFullscreen(false)).catch(() => { });
+      document.exitFullscreen().then(() => setIsFullscreen(false)).catch(() => {});
     }
   };
 
@@ -336,7 +377,6 @@ const HlsVideoPlayer = ({
       ref={containerRef}
       className={`relative overflow-hidden flex items-center justify-center bg-black group select-none ${className}`}
     >
-      {/* Dynamic Ambient Blur Backdrop cho các video tỷ lệ ngang 16:9 khi xem Reels */}
       {isLandscape && effectivePoster && (
         <img
           src={effectivePoster}
@@ -345,13 +385,11 @@ const HlsVideoPlayer = ({
         />
       )}
 
-      {/* HTML5 Video Element */}
       <video
         ref={videoRef}
         poster={effectivePoster}
-        className={`w-full h-full relative z-10 ${isLandscape ? "object-contain" : (objectFit || "object-cover")
-          }`}
-        controls={false} // Tắt controls mặc định của trình duyệt để dùng custom UI đẹp mắt 100%
+        className={`w-full h-full relative z-10 ${isLandscape ? "object-contain" : (objectFit || "object-cover")}`}
+        controls={false}
         loop={loop}
         muted={isMuted}
         playsInline
@@ -383,7 +421,7 @@ const HlsVideoPlayer = ({
           }
           if (parentOnLoadedMetadata) parentOnLoadedMetadata(e);
         }}
-        onCanPlay={(e) => {
+        onCanPlay={() => {
           if (videoRef.current) {
             if (videoRef.current.duration && !isNaN(videoRef.current.duration)) {
               setDuration(videoRef.current.duration);
@@ -411,7 +449,6 @@ const HlsVideoPlayer = ({
         onWaiting={() => setIsLoading(true)}
       />
 
-      {/* Loading Overlay Spinner khi video đang nạp hoặc xử lý ngầm */}
       {isLoading && (
         <div className="absolute inset-0 bg-slate-950/70 backdrop-blur-sm flex flex-col items-center justify-center text-white space-y-2.5 z-20 pointer-events-none transition-opacity duration-300">
           <Loader className="w-8 h-8 text-violet-400 animate-spin" />
@@ -419,7 +456,6 @@ const HlsVideoPlayer = ({
         </div>
       )}
 
-      {/* Nút Play hiển thị chính giữa khi tạm dừng video */}
       {!isPlaying && !isLoading && (
         <div
           onClick={handleTogglePlay}
@@ -431,42 +467,35 @@ const HlsVideoPlayer = ({
         </div>
       )}
 
-      {/* Thanh Điều Khiển & Tua Video Custom Chuẩn Hiện Đại (Custom Controls Bar) */}
       {controls && (
         <div className="absolute bottom-0 left-0 right-0 z-30 px-3 pb-2 pt-6 bg-gradient-to-t from-black/90 via-black/50 to-transparent flex flex-col space-y-1.5 opacity-90 group-hover:opacity-100 transition-opacity duration-200 pointer-events-auto">
-          {/* Thanh Progress Scrubber Tua Video */}
           <div
             className="relative w-full h-1.5 hover:h-2.5 bg-white/20 hover:bg-white/30 rounded-full cursor-pointer transition-all duration-150 group/bar"
             onClick={handleSeek}
           >
             <div
               className="h-full bg-violet-500 rounded-full relative group-hover/bar:bg-violet-400"
-              style={{width: `${duration ? (currentTime / duration) * 100 : 0}%`}}
+              style={{ width: `${duration ? (currentTime / duration) * 100 : 0}%` }}
             >
               <div className="absolute right-0 top-1/2 -translate-y-1/2 w-3 h-3 bg-white rounded-full shadow opacity-0 group-hover/bar:opacity-100 transition-opacity" />
             </div>
           </div>
 
-          {/* Hàng Nút Bật/Tắt, Thời Gian & Fullscreen */}
           <div className="flex justify-between items-center text-white text-xs px-0.5">
             <div className="flex items-center space-x-2.5">
-              {/* Nút Nhanh Play/Pause */}
               <button onClick={handleTogglePlay} className="hover:text-violet-400 transition cursor-pointer">
                 {isPlaying ? <Pause className="w-4 h-4 fill-white" /> : <Play className="w-4 h-4 fill-white" />}
               </button>
 
-              {/* Nút Bật/Tắt Tiếng */}
               <button onClick={handleToggleMute} className="hover:text-violet-400 transition cursor-pointer">
                 {isMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
               </button>
 
-              {/* Thời Gian Đã Phát / Tổng Thời Gian */}
               <span className="text-[10px] font-mono text-white/80">
                 {formatTime(currentTime)} / {formatTime(duration)}
               </span>
             </div>
 
-            {/* Nút Toàn Màn Hình */}
             <button onClick={handleToggleFullscreen} className="hover:text-violet-400 transition cursor-pointer">
               {isFullscreen ? <Minimize className="w-4 h-4" /> : <Maximize className="w-4 h-4" />}
             </button>

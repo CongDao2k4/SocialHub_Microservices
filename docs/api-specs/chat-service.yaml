@@ -1,86 +1,68 @@
-# =======================================================================
-# chat-service — Complete Service Contract
-# =======================================================================
-# Bounded Context: Messaging
-# Responsibility: 1-1 messaging, group chat, realtime via Socket.IO
-# Database: MongoDB
-# Realtime: Socket.IO with Redis adapter (horizontal scaling)
-# Events Published: Redis Pub/Sub (message.sent, group.member.added)
-# =======================================================================
-
 openapi: 3.0.3
 
 info:
-  title: chat-service — Messaging
+  title: chat-service
+  version: 1.1.0
   description: |
-    Manages real-time messaging: 1-1 conversations, group chats, message history,
-    typing indicators, and online presence. Uses Socket.IO for realtime communication
-    with Redis adapter for multi-instance support.
-  version: 1.0.0
+    Chat service for SocialHub.
+
+    Covers:
+    - 1-1 conversations
+    - group chat
+    - message history
+    - typing and presence
+    - WebRTC signaling for audio/video call
+    - ICE server discovery for STUN/TURN
 
 servers:
   - url: http://localhost:5004
-    description: Local development (direct)
+    description: Direct local access
   - url: http://localhost:8080/api
-    description: Local development (via API Gateway)
+    description: Access through Gateway
 
 paths:
   /health:
     get:
-      summary: Health check
-      operationId: healthCheck
       tags: [System]
+      summary: Health check
       responses:
         '200':
-          description: Service is healthy
+          description: Service healthy
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/HealthResponse'
 
-  # ── Conversations (1-1) ──────────────────────────────────────────────
-
   /conversations:
     get:
-      summary: List conversations
-      operationId: listConversations
       tags: [Conversations]
+      summary: List conversations
       security:
         - bearerAuth: []
-      description: |
-        Returns all conversations (1-1 and groups) for the authenticated user,
-        ordered by last message time (newest first).
-        Each conversation includes the last message preview.
       parameters:
-        - name: page
-          in: query
+        - in: query
+          name: page
           schema:
             type: integer
             default: 1
-        - name: limit
-          in: query
+        - in: query
+          name: limit
           schema:
             type: integer
             default: 20
-            maximum: 50
       responses:
         '200':
-          description: List of conversations
+          description: Conversation list
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/PaginatedConversations'
 
     post:
-      summary: Create a 1-1 conversation
-      operationId: createConversation
       tags: [Conversations]
+      summary: Create or reuse a direct conversation
       security:
         - bearerAuth: []
-      description: |
-        Creates a new 1-1 conversation between the authenticated user and another user.
-        If a conversation already exists between the two users, returns the existing one.
-        Derived from: DDD 2.3 command "CreateConversation"
       requestBody:
         required: true
         content:
@@ -91,78 +73,121 @@ paths:
               properties:
                 participantId:
                   type: string
-                  format: uuid
-                  description: The other user to start a conversation with
+                  description: Target user ID
       responses:
-        '201':
-          description: Conversation created
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Conversation'
         '200':
           description: Existing conversation returned
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Conversation'
+        '201':
+          description: Conversation created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Conversation'
         '400':
-          description: Cannot create conversation with self
+          description: Invalid payload
 
-  /conversations/{id}/messages:
+  /conversations/ice-servers:
     get:
-      summary: Get message history
-      operationId: getMessages
-      tags: [Conversations]
+      tags: [WebRTC]
+      summary: Get ICE server configuration
       security:
         - bearerAuth: []
       description: |
-        Returns message history for a conversation, ordered by newest first.
-        Uses cursor-based pagination (before a specific message ID) for efficient
-        infinite scroll loading.
-        Only participants of the conversation can access.
+        Returns the STUN/TURN configuration used by frontend WebRTC call flow.
+
+        Current implementation returns:
+        - Google public STUN servers
+        - TURN server from backend environment variables:
+          - TURN_URL
+          - TURN_USERNAME
+          - TURN_CREDENTIAL
+      responses:
+        '200':
+          description: ICE servers returned
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IceServerResponse'
+
+  /conversations/{id}:
+    get:
+      tags: [Conversations]
+      summary: Get conversation by ID
+      security:
+        - bearerAuth: []
       parameters:
-        - name: id
-          in: path
+        - in: path
+          name: id
           required: true
           schema:
             type: string
-          description: Conversation ID or Group ID
-        - name: before
-          in: query
+      responses:
+        '200':
+          description: Conversation found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Conversation'
+        '404':
+          description: Conversation not found
+
+    delete:
+      tags: [Conversations]
+      summary: Delete conversation
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
           schema:
             type: string
-          description: Message ID — returns messages before this one (cursor)
-        - name: limit
-          in: query
+      responses:
+        '200':
+          description: Conversation deleted
+
+  /conversations/{id}/messages:
+    get:
+      tags: [Conversations]
+      summary: Get message history
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+        - in: query
+          name: before
+          schema:
+            type: string
+          description: Cursor message ID
+        - in: query
+          name: limit
           schema:
             type: integer
             default: 50
-            maximum: 100
       responses:
         '200':
-          description: Messages
+          description: Message history
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/MessageHistory'
         '403':
-          description: Not a participant of this conversation
-
-  # ── Group Chat ────────────────────────────────────────────────────────
+          description: User is not a participant
 
   /groups:
     post:
-      summary: Create a group chat
-      operationId: createGroupChat
       tags: [Groups]
+      summary: Create group
       security:
         - bearerAuth: []
-      description: |
-        Creates a new group chat. The creator becomes the admin.
-        At least 1 other member must be specified (min 2 total including creator).
-        Publishes "group.member.added" event for each member.
-        Derived from: DDD 2.3 command "CreateGroupChat"
       requestBody:
         required: true
         content:
@@ -176,44 +201,34 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/GroupChat'
-        '400':
-          description: Invalid request (empty name, no members)
 
   /groups/{id}:
     get:
-      summary: Get group info
-      operationId: getGroupInfo
       tags: [Groups]
+      summary: Get group detail
       security:
         - bearerAuth: []
       parameters:
-        - name: id
-          in: path
+        - in: path
+          name: id
           required: true
           schema:
             type: string
       responses:
         '200':
-          description: Group details
+          description: Group detail
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/GroupChat'
-        '404':
-          description: Group not found
-
     put:
-      summary: Update group info
-      operationId: updateGroupChat
       tags: [Groups]
+      summary: Update group
       security:
         - bearerAuth: []
-      description: |
-        Updates group name and/or avatar. Only group admin can update.
-        Derived from: DDD 2.3 command "UpdateGroupChat"
       parameters:
-        - name: id
-          in: path
+        - in: path
+          name: id
           required: true
           schema:
             type: string
@@ -226,36 +241,22 @@ paths:
               properties:
                 name:
                   type: string
-                  minLength: 1
-                  maxLength: 100
                 avatarUrl:
                   type: string
-                  format: uri
                   nullable: true
       responses:
         '200':
           description: Group updated
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/GroupChat'
-        '403':
-          description: Only admin can update group info
 
   /groups/{id}/members:
     post:
-      summary: Add a member to the group
-      operationId: addGroupMember
       tags: [Groups]
+      summary: Add member to group
       security:
         - bearerAuth: []
-      description: |
-        Adds a new member to the group. Only admin can add members.
-        Publishes "group.member.added" event for notification.
-        Derived from: DDD 2.3 command "AddGroupMember"
       parameters:
-        - name: id
-          in: path
+        - in: path
+          name: id
           required: true
           schema:
             type: string
@@ -269,83 +270,46 @@ paths:
               properties:
                 userId:
                   type: string
-                  format: uuid
       responses:
         '200':
           description: Member added
-        '403':
-          description: Only admin can add members
-        '409':
-          description: User is already a member
 
   /groups/{id}/members/{userId}:
     delete:
-      summary: Remove a member from the group
-      operationId: removeGroupMember
       tags: [Groups]
+      summary: Remove member from group
       security:
         - bearerAuth: []
-      description: |
-        Removes a member from the group. Admin can remove any member.
-        Non-admin members can only remove themselves (leave).
-        Derived from: DDD 2.3 command "RemoveGroupMember"
       parameters:
-        - name: id
-          in: path
+        - in: path
+          name: id
           required: true
           schema:
             type: string
-        - name: userId
-          in: path
+        - in: path
+          name: userId
           required: true
           schema:
             type: string
-            format: uuid
       responses:
         '200':
           description: Member removed
-        '403':
-          description: Not authorized to remove this member
 
   /groups/{id}/leave:
     post:
-      summary: Leave a group
-      operationId: leaveGroup
       tags: [Groups]
+      summary: Leave group
       security:
         - bearerAuth: []
-      description: |
-        Authenticated user leaves the group. If the user is admin and there are
-        other members, admin role is transferred to the oldest member.
-        If the user is the last member, the group is deleted.
       parameters:
-        - name: id
-          in: path
+        - in: path
+          name: id
           required: true
           schema:
             type: string
       responses:
         '200':
-          description: Left the group
-
-# =======================================================================
-# SECTION 2 — Socket.IO Events (x-socketio-events extension)
-# =======================================================================
-# Socket.IO connection: ws://localhost:5004 (or via Gateway ws://localhost:8080)
-# Authentication: JWT token passed in handshake auth: { token: "Bearer ..." }
-# Namespace: / (default)
-#
-# On connect:
-#   1. Validate JWT from handshake
-#   2. Join user-specific room: `user:{userId}`
-#   3. Join all conversation rooms: `conv:{conversationId}`
-#   4. Set online presence in Redis: online:{userId}
-#   5. Broadcast "user:online" to friends
-#
-# On disconnect:
-#   1. Remove online presence from Redis
-#   2. Broadcast "user:offline" to friends
-# =======================================================================
+          description: Left group
 
 x-socketio-events:
   enabled: true
@@ -353,237 +317,75 @@ x-socketio-events:
   authentication: JWT in handshake auth object
 
   client-to-server:
-    - event: "message:send"
-      description: Client sends a message in a conversation or group
-      payload:
-        conversationId: string (conversation or group ID)
-        content: string (message text)
-        type: string (text | image), default "text"
-        mediaId: string (uuid, optional — if type is "image")
-      response:
-        event: "message:received"
-        broadcast: to conversation room
-      analysisRef: "DDD 2.3 command: SendMessage"
-
-    - event: "message:read"
-      description: Client marks messages as read up to a specific message
-      payload:
-        conversationId: string
-        messageId: string (read up to this message)
-      response:
-        event: "message:read:ack"
-        broadcast: to conversation room
-
-    - event: "typing:start"
-      description: Client starts typing in a conversation
-      payload:
-        conversationId: string
-      response:
-        event: "typing:indicator"
-        broadcast: to conversation room (excluding sender)
-
-    - event: "typing:stop"
-      description: Client stops typing
-      payload:
-        conversationId: string
-      response:
-        event: "typing:indicator"
-        broadcast: to conversation room (excluding sender)
+    - event: message:send
+      description: Send a new message
+    - event: message:read
+      description: Mark messages as read
+    - event: typing:start
+      description: Start typing
+    - event: typing:stop
+      description: Stop typing
+    - event: presence:heartbeat
+      description: Refresh online presence TTL
 
   server-to-client:
-    - event: "message:received"
-      description: A new message was sent in a conversation the user belongs to
-      payload:
-        id: string (message ID)
-        conversationId: string
-        senderId: string (uuid)
-        senderName: string
-        senderAvatar: string (url, nullable)
-        content: string
-        type: string (text | image)
-        mediaUrl: string (presigned URL, if image)
-        createdAt: string (ISO-8601)
-
-    - event: "message:read:ack"
-      description: Messages were read by another participant
-      payload:
-        conversationId: string
-        messageId: string (read up to)
-        readBy: string (uuid of reader)
-        readAt: string (ISO-8601)
-
-    - event: "typing:indicator"
-      description: Another user is typing in a conversation
-      payload:
-        conversationId: string
-        userId: string (uuid)
-        displayName: string
-        isTyping: boolean
-
-    - event: "user:online"
-      description: A friend came online
-      payload:
-        userId: string (uuid)
-
-    - event: "user:offline"
-      description: A friend went offline
-      payload:
-        userId: string (uuid)
-
-  # ── Video/Audio Call Signaling (WebRTC) ──────────────────────────────
-  # WebRTC is peer-to-peer: video/audio streams flow directly between browsers.
-  # The server only relays signaling metadata (SDP offers/answers and ICE candidates)
-  # via Socket.IO. No media is stored or processed on the server.
-  #
-  # ICE Servers used by clients:
-  #   - stun:stun.l.google.com:19302 (Google public STUN, free)
-  #   - stun:stun1.l.google.com:19302
-  # ─────────────────────────────────────────────────────────────────────
+    - event: message:received
+      description: New message broadcast
+    - event: message:read:ack
+      description: Read acknowledgement
+    - event: typing:indicator
+      description: Typing indicator for other participants
+    - event: user:online
+      description: User came online
+    - event: user:offline
+      description: User went offline
 
   call-signaling-client-to-server:
-    - event: "call:initiate"
-      description: Caller initiates a video/audio call to a target user
-      payload:
-        targetUserId: string (uuid, the user being called)
-        callerName: string (display name of the caller)
-        callerAvatar: string (avatar URL of the caller, nullable)
-        callType: string (video | audio)
-      response:
-        event: "call:incoming" (sent to target user's personal room)
-      error: If target user is offline, emits "call:rejected" back to caller with reason "offline"
+    - event: call:initiate
+      description: |
+        Initiate 1-1 or group call.
 
-    - event: "call:accept"
-      description: Callee accepts the incoming call
-      payload:
-        callerId: string (uuid)
-        calleeName: string
-        calleeAvatar: string (nullable)
-      response:
-        event: "call:accepted" (sent to caller's personal room)
-
-    - event: "call:reject"
-      description: Callee rejects or ignores the incoming call
-      payload:
-        callerId: string (uuid)
-        reason: string (rejected | busy | timeout), default "rejected"
-      response:
-        event: "call:rejected" (sent to caller's personal room)
-
-    - event: "call:end"
-      description: Either party ends the active call
-      payload:
-        targetUserId: string (uuid, the other participant)
-      response:
-        event: "call:ended" (sent to target user's personal room)
-
-    - event: "webrtc:offer"
-      description: Caller sends SDP Offer to callee (WebRTC signaling step 1)
-      payload:
-        targetUserId: string (uuid)
-        sdp: object (RTCSessionDescription — type + sdp string)
-      response:
-        event: "webrtc:offer" (forwarded to target user's personal room)
-
-    - event: "webrtc:answer"
-      description: Callee sends SDP Answer to caller (WebRTC signaling step 2)
-      payload:
-        targetUserId: string (uuid)
-        sdp: object (RTCSessionDescription — type + sdp string)
-      response:
-        event: "webrtc:answer" (forwarded to target user's personal room)
-
-    - event: "webrtc:ice-candidate"
-      description: Either party sends an ICE candidate for NAT traversal
-      payload:
-        targetUserId: string (uuid)
-        candidate: object (RTCIceCandidate — candidate, sdpMid, sdpMLineIndex)
-      response:
-        event: "webrtc:ice-candidate" (forwarded to target user's personal room)
+        Supported payloads:
+        - 1-1: `targetUserId`, `callerName`, `callerAvatar`, `callType`
+        - group: `targetUserIds[]`, `groupId`, `groupName`, `groupAvatar`, `callType`
+    - event: call:accept
+      description: Accept incoming call
+    - event: call:reject
+      description: Reject incoming call
+    - event: call:end
+      description: End active call
+    - event: webrtc:offer
+      description: Forward SDP offer
+    - event: webrtc:answer
+      description: Forward SDP answer
+    - event: webrtc:ice-candidate
+      description: Forward ICE candidate
+    - event: group-call:join
+      description: Join group call room
+    - event: group-call:leave
+      description: Leave group call room
 
   call-signaling-server-to-client:
-    - event: "call:incoming"
-      description: Notifies target user of an incoming call (sent to personal room user:{userId})
-      payload:
-        callerId: string (uuid)
-        callerName: string
-        callerAvatar: string (nullable)
-        callType: string (video | audio)
-
-    - event: "call:accepted"
-      description: Notifies caller that callee accepted the call
-      payload:
-        calleeId: string (uuid)
-        calleeName: string
-        calleeAvatar: string (nullable)
-
-    - event: "call:rejected"
-      description: Notifies caller that callee rejected or is unavailable
-      payload:
-        calleeId: string (uuid)
-        reason: string (rejected | busy | timeout | offline)
-
-    - event: "call:ended"
-      description: Notifies the other party that the call has ended
-      payload:
-        userId: string (uuid, the user who ended the call)
-
-    - event: "webrtc:offer"
-      description: Forwarded SDP Offer from caller
-      payload:
-        senderId: string (uuid)
-        sdp: object (RTCSessionDescription)
-
-    - event: "webrtc:answer"
-      description: Forwarded SDP Answer from callee
-      payload:
-        senderId: string (uuid)
-        sdp: object (RTCSessionDescription)
-
-    - event: "webrtc:ice-candidate"
-      description: Forwarded ICE Candidate from either party
-      payload:
-        senderId: string (uuid)
-        candidate: object (RTCIceCandidate)
-
-# =======================================================================
-# SECTION 3 — Async / Event-driven (x-async-events extension)
-# =======================================================================
-
-x-async-events:
-  enabled: true
-  broker: redis
-  brokerUrl: redis://redis:6379
-
-  publishes:
-    - channel: message.sent
-      description: Emitted when a message is sent to an offline recipient (for push notification)
-      analysisRef: "DDD 2.2 Domain Event: MessageSent"
-      message:
-        name: MessageSentEvent
-        fields:
-          - { name: eventId,        type: string (uuid) }
-          - { name: senderId,       type: string (uuid) }
-          - { name: conversationId, type: string }
-          - { name: recipientId,    type: string (uuid), description: Offline recipient to notify }
-          - { name: preview,        type: string, description: First 100 chars of message }
-          - { name: occurredAt,     type: string (ISO-8601 datetime) }
-
-    - channel: group.member.added
-      description: Emitted when a new member is added to a group chat
-      analysisRef: "DDD 2.2 Domain Event: GroupMemberAdded"
-      message:
-        name: GroupMemberAddedEvent
-        fields:
-          - { name: eventId,       type: string (uuid) }
-          - { name: groupId,       type: string }
-          - { name: groupName,     type: string }
-          - { name: addedUserId,   type: string (uuid) }
-          - { name: addedByUserId, type: string (uuid) }
-          - { name: occurredAt,    type: string (ISO-8601 datetime) }
-
-# =======================================================================
-# Shared Schemas
-# =======================================================================
+    - event: call:incoming
+      description: Incoming 1-1 or group call
+    - event: call:accepted
+      description: Call accepted
+    - event: call:rejected
+      description: Call rejected or target unavailable
+    - event: call:ended
+      description: Call ended
+    - event: webrtc:offer
+      description: Forwarded SDP offer
+    - event: webrtc:answer
+      description: Forwarded SDP answer
+    - event: webrtc:ice-candidate
+      description: Forwarded ICE candidate
+    - event: group-call:joined-room
+      description: Existing participants list when joining group call room
+    - event: group-call:user-joined
+      description: Another user joined group call room
+    - event: group-call:user-left
+      description: Another user left group call room
 
 components:
   securitySchemes:
@@ -599,6 +401,33 @@ components:
         status:
           type: string
           example: ok
+
+    IceServerResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+          properties:
+            iceServers:
+              type: array
+              items:
+                type: object
+                properties:
+                  urls:
+                    oneOf:
+                      - type: string
+                      - type: array
+                        items:
+                          type: string
+                  username:
+                    type: string
+                    nullable: true
+                  credential:
+                    type: string
+                    nullable: true
 
     Conversation:
       type: object
@@ -629,12 +458,10 @@ components:
       properties:
         userId:
           type: string
-          format: uuid
         displayName:
           type: string
         avatarUrl:
           type: string
-          format: uri
           nullable: true
         isOnline:
           type: boolean
@@ -644,10 +471,8 @@ components:
       properties:
         content:
           type: string
-          description: First 100 chars
         senderId:
           type: string
-          format: uuid
         senderName:
           type: string
         createdAt:
@@ -663,12 +488,10 @@ components:
           type: string
         senderId:
           type: string
-          format: uuid
         senderName:
           type: string
         senderAvatar:
           type: string
-          format: uri
           nullable: true
         content:
           type: string
@@ -677,20 +500,7 @@ components:
           enum: [text, image]
         mediaUrl:
           type: string
-          format: uri
           nullable: true
-          description: Presigned URL (if type is image)
-        readBy:
-          type: array
-          items:
-            type: object
-            properties:
-              userId:
-                type: string
-                format: uuid
-              readAt:
-                type: string
-                format: date-time
         createdAt:
           type: string
           format: date-time
@@ -714,19 +524,13 @@ components:
       properties:
         name:
           type: string
-          minLength: 1
-          maxLength: 100
-          example: "3A Friends"
         memberIds:
           type: array
           items:
             type: string
-            format: uuid
           minItems: 1
-          description: User IDs to add (creator is added automatically as admin)
         avatarUrl:
           type: string
-          format: uri
           nullable: true
 
     GroupChat:
@@ -738,28 +542,11 @@ components:
           type: string
         avatarUrl:
           type: string
-          format: uri
           nullable: true
         members:
           type: array
           items:
             type: object
-            properties:
-              userId:
-                type: string
-                format: uuid
-              displayName:
-                type: string
-              avatarUrl:
-                type: string
-                format: uri
-                nullable: true
-              role:
-                type: string
-                enum: [admin, member]
-              joinedAt:
-                type: string
-                format: date-time
         memberCount:
           type: integer
         createdAt:
@@ -774,16 +561,13 @@ components:
           items:
             $ref: '#/components/schemas/Conversation'
         pagination:
-          $ref: '#/components/schemas/Pagination'
-
-    Pagination:
-      type: object
-      properties:
-        page:
-          type: integer
-        limit:
-          type: integer
-        total:
-          type: integer
-        totalPages:
-          type: integer
+          type: object
+          properties:
+            page:
+              type: integer
+            limit:
+              type: integer
+            total:
+              type: integer
+            totalPages:
+              type: integer

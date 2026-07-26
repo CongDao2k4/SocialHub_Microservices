@@ -1,109 +1,151 @@
-# API Gateway — SocialHub
+# API Gateway
 
-> **API Gateway** — Cửa ngõ duy nhất (Single Entry Point) cho toàn bộ client requests của hệ thống SocialHub. 
-> Chịu trách nhiệm bảo mật, định tuyến động (routing), giới hạn lượt gọi (rate limiting), chống lỗi tràn (circuit breaking), kiểm thử Swagger UI tập trung và ủy nhiệm kết nối Socket.IO (WebSocket Proxy).
+Gateway la diem vao duy nhat cho frontend va cac client khac cua SocialHub. Service nay lam 4 viec chinh:
 
----
+- xac thuc JWT va inject `x-user-id`, `x-user-jti` cho downstream service
+- routing `/api/*` den dung microservice
+- gioi han request theo IP
+- proxy stream media va proxy WebSocket cho chat / notification
 
-## 📋 Tổng Quan (Overview)
+## Runtime
 
-`gateway` được phát triển bằng **Node.js (Express)** đóng vai trò như một Reverse Proxy và Gateway trung tâm điều khiển lưu lượng:
+- Internal port: `8000`
+- Host port trong `docker-compose.yml`: `8080`
+- Health check: `GET /health`
+- Swagger UI tap trung: `GET /api-docs`
 
-- **Định tuyến (Routing)**: Phân phối request từ client tới các service tương ứng (`user`, `friend`, `post`, `chat`, `media`, `notification`) dựa trên URL prefix.
-- **Xác thực JWT Tập Trung (JWT Validation)**: Tự động trích xuất và verify access token JWT sử dụng secret key chung và kiểm tra blacklist token trong Redis.
-- **Header Injection**: Sau khi xác thực thành công, Gateway sẽ tự động inject `x-user-id` và `x-user-jti` vào header của request trước khi forward đi, giúp các downstream service tin tưởng thông tin định danh mà không cần decode lại.
-- **Giới hạn lượt gọi (Rate Limiting)**: Sử dụng Redis sliding window counter (`ratelimit:{ip}:{endpoint}`) để giới hạn tối đa 100 requests/phút cho mỗi IP nhằm chống tấn công spam/DDoS.
-- **Fault Tolerance (Circuit Breakers)**: Tách biệt Circuit Breaker cho từng downstream service bằng thư viện **Opossum**. Khi một service gặp sự cố hoặc timeout, Gateway sẽ tự động ngắt mạch (trip) và trả về phản hồi fallback thân thiện (`503 Service Unavailable`) ngay lập tức thay vì chờ đợi timeout gây nghẽn hệ thống.
-- **Centralized Swagger UI**: Tích hợp Swagger UI tại `/api-docs` cho phép lập trình viên kiểm thử tất cả các REST API của toàn bộ hệ thống thông qua giao diện dropdown lựa chọn service trực quan.
-- **WebSocket Reverse Proxy**: Ủy quyền nâng cấp giao thức (HTTP Upgrade) cho Socket.IO để kết nối truyền thông tin realtime từ Gateway thẳng tới `notification-service` và `chat-service` độc lập thông qua việc nhận diện tiền tố đường dẫn.
+## Routing matrix
 
----
+Tat ca REST request cua frontend di qua `http://localhost:8080/api`.
 
-## 🛠️ Công Nghệ Sử Dụng (Tech Stack)
+| Gateway route | Downstream | Rewrite |
+| --- | --- | --- |
+| `/api/auth/*` | `user-service` | giu nguyen `/api/auth/*` |
+| `/api/users/*` | `user-service` | giu nguyen `/api/users/*` |
+| `/api/friends/*` | `friend-service` | giu nguyen `/api/friends/*` |
+| `/api/posts/*` | `post-service` | bo prefix `/api` |
+| `/api/feed/*` | `post-service` | bo prefix `/api` |
+| `/api/reels/*` | `post-service` | bo prefix `/api` |
+| `/api/conversations/*` | `chat-service` | bo prefix `/api` |
+| `/api/groups/*` | `chat-service` | bo prefix `/api` |
+| `/api/notifications/*` | `notification-service` | bo prefix `/api` |
+| `/api/media/upload` | `media-service` | bo prefix `/api` |
+| `/api/media/batch-urls` | `media-service` | bo prefix `/api` |
+| `/api/media/file/:id` | `media-service` | bo prefix `/api` |
+| `/api/media/hls/:id/index.m3u8` | `media-service` | bo prefix `/api` |
+| `/api/media/hls/:id/:segment` | `media-service` | bo prefix `/api` |
+| `/api/media/:id` | `media-service` | bo prefix `/api` |
+| `/api/media/:id/url` | `media-service` | bo prefix `/api` |
 
-| Thành phần | Công nghệ lựa chọn |
-|---|---|
-| Language | Node.js 20 Slim (ES Modules) |
-| Framework | Express v5 |
-| API Docs | swagger-ui-express, js-yaml |
-| HTTP Client | Axios (Raw request streaming) |
-| Fault Tolerance | Opossum (Circuit Breaker) |
-| Cache/Blacklist | Redis (via ioredis) |
-| Port | `8080` (host) / `8000` (internal) |
+## Auth va security
 
----
+- Public routes:
+  - `POST /api/auth/register`
+  - `POST /api/auth/login`
+  - `POST /api/auth/refresh`
+  - `GET /api/media/file/:id`
+  - `GET /api/media/hls/:id/index.m3u8`
+  - `GET /api/media/hls/:id/:segment`
+- Protected routes dung `protectRoute` de verify bearer token.
+- Sau khi verify thanh cong, Gateway tu them:
+  - `x-user-id`
+  - `x-user-jti` neu co trong token
 
-## 🗺️ Routing & Security Matrix
+## Rate limit
 
-Client kết nối qua Gateway bằng cổng `8080` trên host với URL bắt đầu bằng `/api`:
+- Middleware duoc gan tai `app.use('/api', rateLimiter(100, 60), gatewayRoutes)`
+- Muc mac dinh: `100 requests / 60s / IP`
+- Luong stream public `/media/file/*` va `/media/hls/*` duoc middleware rate limiter xu ly theo logic rieng trong `rate-limiter.middleware.js`
 
-| Gateway Route | Downstream Service | Downstream Route | Auth Required? | Action on Auth Success / Rewrite |
-|---|---|---|---|---|
-| `GET /health` | *Gateway Local* | — | ❌ No | Trả về trạng thái Gateway |
-| `POST /api/auth/register` | `user-service` | `/api/auth/register` | ❌ No | Forward request trực tiếp |
-| `POST /api/auth/login` | `user-service` | `/api/auth/login` | ❌ No | Forward request trực tiếp |
-| `POST /api/auth/refresh` | `user-service` | `/api/auth/refresh` | ❌ No | Forward request trực tiếp |
-| `POST /api/auth/logout` | `user-service` | `/api/auth/logout` | ✅ Yes (JWT) | Forward kèm Bearer Token để blacklist |
-| `GET /api/users/search` | `user-service` | `/api/users/search` | ✅ Yes (JWT) | Inject `x-user-id` & forward |
-| `GET /api/users/:id` | `user-service` | `/api/users/:id` | ✅ Yes (JWT) | Inject `x-user-id` & forward |
-| `PUT /api/users/:id` | `user-service` | `/api/users/:id` | ✅ Yes (JWT) | Inject `x-user-id` & forward |
-| `POST /api/friends/**` | `friend-service` | `/api/friends/**` | ✅ Yes (JWT) | Giữ nguyên tiền tố `/api/friends`, inject `x-user-id` & forward |
-| `POST /api/posts/**` | `post-service` | `/posts/**` | ✅ Yes (JWT) | Strip `/api`, inject `x-user-id` & forward |
-| `GET /api/feed` | `post-service` | `/feed` | ✅ Yes (JWT) | Strip `/api`, inject `x-user-id` & forward |
-| `POST /api/conversations/**`| `chat-service` | `/conversations/**`| ✅ Yes (JWT) | Strip `/api`, inject `x-user-id` & forward |
-| `POST /api/groups/**` | `chat-service` | `/groups/**` | ✅ Yes (JWT) | Strip `/api`, inject `x-user-id` & forward |
-| `POST /api/media/upload`| `media-service` | `/media/upload` | ✅ Yes (JWT) | Strip `/api`, inject `x-user-id` & stream proxy |
-| `GET /api/media/file/:id` | `media-service` | `/media/file/:id` | ❌ No | Strip `/api` & stream proxy (Public) |
-| `GET /api/media/:id` | `media-service` | `/media/:id` | ✅ Yes (JWT) | Strip `/api`, inject `x-user-id` & forward |
-| `GET /api/media/:id/url`| `media-service` | `/media/:id/url` | ✅ Yes (JWT) | Strip `/api`, inject `x-user-id` & forward |
-| `DELETE /api/media/:id` | `media-service` | `/media/:id` | ✅ Yes (JWT) | Strip `/api`, inject `x-user-id` & forward |
-| `GET /api/notifications/**`| `notification-service` | `/notifications/**`| ✅ Yes (JWT) | Strip `/api`, inject `x-user-id` & forward |
+## Media proxy va streaming
 
----
+Gateway khong tu xu ly file media. No chi stream lai tu `media-service`.
 
-## ⚡ WebSocket Proxying (Socket.IO Connection)
+Trang thai hien tai:
 
-Để hỗ trợ cả tính năng thông báo và nhắn tin chat thời gian thực qua một cổng Gateway duy nhất mà không bị xung đột bắt tay (Upgrade Collision), Gateway sử dụng cơ chế định tuyến dựa trên tiền tố đường dẫn:
+- media upload video co the cho den khi HLS transcode xong moi tra `201`
+- public HLS playlist va segment di qua:
+  - `/api/media/hls/:id/index.m3u8`
+  - `/api/media/hls/:id/:segment`
+- stream proxy dung `pipeline(...)` thay vi `pipe(...)` de giam loi:
+  - `ECONNRESET`
+  - `ERR_STREAM_PREMATURE_CLOSE`
+- media circuit breaker timeout mac dinh da tang len `180000ms` de du cho upload video + FFmpeg HLS
 
-1. **Path `/notification/socket.io/`**:
-   - Gateway phát hiện và chuyển tiếp nâng cấp giao thức sang `notification-service` (`http://localhost:5006/socket.io/...`), tự động loại bỏ tiền tố `/notification`.
-2. **Path `/chat/socket.io/`**:
-   - Gateway phát hiện và chuyển tiếp nâng cấp giao thức sang `chat-service` (`http://localhost:5004/socket.io/...`), tự động loại bỏ tiền tố `/chat`.
+## Circuit breaker
 
-Dữ liệu nâng cấp giao thức được chuyển tiếp và kết nối trực tiếp (TCP piping):
-```javascript
-proxySocket.pipe(socket).pipe(proxySocket);
+Gateway dung `opossum` cho tung downstream service.
+
+Gia tri hien tai:
+
+- default timeout: `5000ms`
+- media timeout: `180000ms`
+- error threshold: `50%`
+- reset timeout: `10000ms`
+
+Khi stream bi client dong som, Gateway bo qua cac loi abort/reset thay vi co gang ghi de response.
+
+## WebSocket proxy
+
+Gateway tach rieng 2 duong Socket.IO:
+
+- Notification socket: `/notification/socket.io/`
+- Chat socket: `/chat/socket.io/`
+
+Trong do chat socket phuc vu ca:
+
+- messaging
+- typing / presence
+- call signaling
+- WebRTC offer / answer / ICE candidate
+
+## Video call + TURN
+
+Gateway khong sinh `iceServers`, nhung la diem vao cho frontend goi:
+
+- `GET /api/conversations/ice-servers`
+
+Route nay duoc forward sang `chat-service`, service se tra ve:
+
+- danh sach STUN public
+- TURN server tu bien moi truong:
+  - `TURN_URL`
+  - `TURN_USERNAME`
+  - `TURN_CREDENTIAL`
+
+Xem them tai lieu chi tiet:
+
+- [docs/video-call-turn-server.md](../docs/video-call-turn-server.md)
+- [README_CONFIG_TURN_SERVER_GOOGLE_CLOUD.md](../README_CONFIG_TURN_SERVER_GOOGLE_CLOUD.md)
+- [README_CONFIG_TURN_SERVER_ORACLE.md](../README_CONFIG_TURN_SERVER_ORACLE.md)
+
+## Bien moi truong quan trong
+
+| Variable | Default |
+| --- | --- |
+| `PORT` | `8000` |
+| `USER_SERVICE_URL` | `http://user-service:5000` |
+| `FRIEND_SERVICE_URL` | `http://friend-service:5000` |
+| `POST_SERVICE_URL` | `http://post-service:5000` |
+| `CHAT_SERVICE_URL` | `http://localhost:5004` |
+| `MEDIA_SERVICE_URL` | `http://media-service:5000` |
+| `NOTIFICATION_SERVICE_URL` | `http://notification-service:5000` |
+| `REDIS_URL` | `redis://redis:6379` |
+| `JWT_SECRET` | app secret dung chung |
+| `CIRCUIT_BREAKER_TIMEOUT` | `5000` |
+| `MEDIA_CIRCUIT_BREAKER_TIMEOUT` | `180000` neu khong set |
+| `CIRCUIT_BREAKER_ERROR_THRESHOLD` | `50` |
+| `CIRCUIT_BREAKER_RESET_TIMEOUT` | `10000` |
+
+## Kiem tra nhanh
+
+```bash
+cd gateway
+npm install
+npm run dev
 ```
 
----
-
-## 🛡️ Circuit Breaker & Fallback
-
-Gateway bảo vệ hệ thống khỏi sập dây chuyền (Cascading Failures) bằng cách bọc các request downstream trong các Circuit Breaker riêng biệt:
-
-- **Giới hạn Timeout**: Mặc định 5 giây. Nếu service không phản hồi, coi như lỗi.
-- **Tỷ lệ lỗi tối đa**: Mặc định 50%. Nếu quá nửa số request bị lỗi (mã >= 500 hoặc timeout) trong cửa sổ giám sát, mạch sẽ chuyển sang **OPEN**.
-- **Thời gian giữ mạch mở**: Mặc định 10 giây. Sau thời gian này, mạch chuyển sang **HALF-OPEN** để thử nghiệm một số request. Nếu thành công, mạch sẽ **CLOSE** trở lại.
-- **Phản hồi Fallback**: Khi mạch mở (OPEN), mọi request gửi tới service đó sẽ bị chặn ngay tại Gateway và trả về lỗi `503 Service Unavailable`.
-- **Chuyển tiếp lỗi 500**: Khi service hoạt động bình thường nhưng trả về các lỗi ứng dụng (mã 500) kèm JSON mô tả lỗi, Gateway chuyển tiếp nguyên vẹn nội dung lỗi này về cho frontend để hỗ trợ chẩn đoán chính xác.
-
----
-
-## ⚙️ Biến Môi Trường (Environment Variables)
-
-Các biến cấu hình khai báo trong file `.env` của Gateway:
-
-| Biến môi trường | Mô tả | Giá trị mặc định |
-|---|---|---|
-| `PORT` | Cổng HTTP Server của Gateway lắng nghe | `8080` |
-| `USER_SERVICE_URL` | Địa chỉ user-service trên máy host | `http://localhost:5001` |
-| `FRIEND_SERVICE_URL` | Địa chỉ friend-service trên máy host | `http://localhost:5002` |
-| `POST_SERVICE_URL` | Địa chỉ post-service trên máy host | `http://localhost:5003` |
-| `CHAT_SERVICE_URL` | Địa chỉ chat-service trên máy host | `http://localhost:5004` |
-| `MEDIA_SERVICE_URL` | Địa chỉ media-service trên máy host | `http://localhost:5005` |
-| `NOTIFICATION_SERVICE_URL`| Địa chỉ notification-service trên máy host | `http://localhost:5006` |
-| `JWT_SECRET` | Secret key chung dùng để giải mã JWT | `your-jwt-secret-change-in-production` |
-| `REDIS_URL` | Link kết nối Redis Server | `redis://localhost:6379` |
-| `CIRCUIT_BREAKER_TIMEOUT` | Thời gian chờ tối đa downstream phản hồi (ms) | `5000` |
-| `CIRCUIT_BREAKER_ERROR_THRESHOLD` | Tỷ lệ phần trăm request lỗi để mở mạch (%) | `50` |
-| `CIRCUIT_BREAKER_RESET_TIMEOUT` | Thời gian giữ trạng thái OPEN trước khi chuyển HALF-OPEN (ms)| `10000` |
+```bash
+curl http://localhost:8080/health
+curl http://localhost:8080/api-docs
+```

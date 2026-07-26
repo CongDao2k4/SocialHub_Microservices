@@ -1,226 +1,175 @@
-# Chat Service — Messaging
+# chat-service
 
-> Bounded Context: Realtime Messaging & Group Management
-> Quản lý hội thoại 1-1, nhóm chat, lịch sử tin nhắn, typing indicator, online presence, **gọi điện Video/Audio (WebRTC)** và phát hành sự kiện realtime.
+`chat-service` quan ly conversation, message, group chat, realtime presence va signaling cho audio/video call.
 
-## Overview
+## Chuc nang chinh
 
-- **1-1 Messaging & Group Chat**: Nhắn tin trực tiếp giữa 2 cá nhân và theo nhóm.
-- **Realtime via Socket.IO**: Sử dụng Socket.IO v4 kết hợp `@socket.io/redis-adapter` hỗ trợ mở rộng ngang (horizontal scaling) qua nhiều container instances.
-- **Message History**: Lưu trữ tin nhắn MongoDB, hỗ trợ phân trang cursor-based pagination thông qua compound index (`conversationId`, `createdAt`).
-- **Realtime Features**: Typing indicators (`typing:start`, `typing:stop`), read receipts (`message:read`), online presence (`user:online`, `user:offline`, `presence:heartbeat`).
-- **Video/Audio Call (WebRTC)**: Gọi điện video/audio 1-1 peer-to-peer. `chat-service` đóng vai trò **Signaling Server** — chuyển tiếp SDP Offer/Answer và ICE Candidates qua Socket.IO. Luồng media đi trực tiếp giữa 2 trình duyệt (P2P, mã hóa DTLS-SRTP). Sử dụng Google STUN Server miễn phí cho NAT traversal.
-- **Redis Pub/Sub Events**: Phát hành các sự kiện `message.sent` (khi người nhận offline) và `group.member.added` để `notification-service` xử lý gửi thông báo đẩy.
-- **Inter-service Integration**: Gọi REST API sang `user-service` (lấy thông tin người dùng batch) và `media-service` (lấy URL ảnh presigned).
+- conversation 1-1
+- group chat
+- luu lich su tin nhan trong MongoDB
+- typing indicator, read receipt, online presence
+- signaling cho WebRTC call 1-1 va group call
+- tra ve `iceServers` de frontend lay STUN/TURN tu backend
 
-## Tech Stack
+## Runtime
 
-| Component  | Choice                              | Lý do |
-|------------|-------------------------------------|-------|
-| Runtime    | Node.js 20 (ESM)                    | Nhẹ, non-blocking I/O, tối ưu cho kết nối realtime WebSocket |
-| Framework  | Express v4 + Socket.IO v4           | Hỗ trợ HTTP REST APIs và kết nối WebSockets |
-| Database   | MongoDB (Mongoose)                  | Dữ liệu dạng tài liệu linh hoạt cho cấu trúc cuộc hội thoại & tin nhắn |
-| Cache/PubSub| Redis (ioredis)                    | Lưu trạng thái online (`online:{userId}` TTL 5m) và truyền tin Pub/Sub |
-| Adapter    | @socket.io/redis-adapter            | Chia sẻ socket state giữa nhiều instance container |
+- Internal port: `5000`
+- Host port trong `docker-compose.yml`: `5004`
+- Health check: `GET /health`
 
----
+## REST endpoints
 
-## API Endpoints (REST API)
+Tat ca route duoi day, tru `/health`, deu yeu cau auth.
 
-Tất cả các endpoint REST (ngoại trừ `/health`) đều yêu cầu xác thực JWT. Khi qua API Gateway, Gateway sẽ chuyển tiếp Header `Authorization: Bearer <JWT_TOKEN>` hoặc các header định danh (`x-user-id`, `x-user-name`, `x-user-avatar`).
+| Method | Endpoint | Mo ta |
+| --- | --- | --- |
+| `GET` | `/health` | health check |
+| `GET` | `/conversations` | lay danh sach conversation |
+| `POST` | `/conversations` | tao hoac lay conversation 1-1 |
+| `GET` | `/conversations/ice-servers` | lay STUN/TURN config cho WebRTC |
+| `GET` | `/conversations/:id` | lay chi tiet conversation |
+| `GET` | `/conversations/:id/messages` | lay lich su tin nhan |
+| `DELETE` | `/conversations/:id` | xoa conversation |
+| `POST` | `/groups` | tao group |
+| `GET` | `/groups/:id` | lay chi tiet group |
+| `PUT` | `/groups/:id` | cap nhat group |
+| `POST` | `/groups/:id/members` | them member |
+| `DELETE` | `/groups/:id/members/:userId` | xoa member |
+| `POST` | `/groups/:id/leave` | roi group |
 
-| Method | Endpoint (qua Gateway `/api`)      | Direct Endpoint (port `5004`)      | Description                                         |
-|--------|-----------------------------------|-----------------------------------|-----------------------------------------------------|
-| GET    | —                                 | `/health`                         | Health check dịch vụ (Public)                      |
-| GET    | `/conversations`                  | `/conversations`                  | Lấy danh sách hội thoại của người dùng đăng nhập    |
-| POST   | `/conversations`                  | `/conversations`                  | Tạo mới hoặc lấy cuộc hội thoại 1-1 (`targetUserId`)|
-| GET    | `/conversations/:id/messages`     | `/conversations/:id/messages`     | Lấy lịch sử tin nhắn (hỗ trợ `limit`, `before`)     |
-| POST   | `/groups`                         | `/groups`                         | Tạo nhóm chat mới (`name`, `memberIds`, `avatarUrl`)|
-| GET    | `/groups/:id`                     | `/groups/:id`                     | Lấy thông tin chi tiết nhóm chat                    |
-| PUT    | `/groups/:id`                     | `/groups/:id`                     | Cập nhật tên/avatar nhóm (Chỉ Admin nhóm)          |
-| POST   | `/groups/:id/members`             | `/groups/:id/members`             | Thêm thành viên vào nhóm (Chỉ Admin nhóm)           |
-| DELETE | `/groups/:id/members/:userId`     | `/groups/:id/members/:userId`     | Xóa thành viên khỏi nhóm (Admin hoặc tự rời)        |
-| POST   | `/groups/:id/leave`               | `/groups/:id/leave`               | Rời khỏi nhóm chat                                  |
+## `GET /conversations/ice-servers`
 
-> Tham khảo thêm tài liệu OpenAPI: [`docs/api-specs/chat-service.yaml`](../../docs/api-specs/chat-service.yaml)
+Endpoint nay duoc frontend goi truoc khi bat dau call.
 
----
+Response hien tai gom:
 
-## Socket.IO Realtime Events
+- STUN Google public
+- TURN server tu bien moi truong:
+  - `TURN_URL`
+  - `TURN_USERNAME`
+  - `TURN_CREDENTIAL`
 
-Kết nối WebSocket được thiết lập qua đường dẫn `/socket.io/` với handshake auth:
-* Direct: `ws://localhost:5004/socket.io/` với `{ auth: { token: "Bearer <JWT>" } }` hoặc query `token`.
-* Gateway: `ws://localhost:8080/socket.io/`
+Dieu nay giup frontend khong phai hardcode TURN credential trong code production.
 
-### Client → Server (Sự kiện gửi lên)
+## Socket.IO
 
-* **`conversation:join`**: Tham gia vào room hội thoại cụ thể.
-  * Payload: `{ conversationId }`
-* **`message:send`**: Gửi tin nhắn mới trong hội thoại.
-  * Payload: `{ conversationId, content, type: "text" | "image", mediaId? }`
-* **`message:read`**: Báo đã đọc tin nhắn trong hội thoại.
-  * Payload: `{ conversationId, messageId }`
-* **`typing:start`**: Báo đang soạn thảo tin nhắn.
-  * Payload: `{ conversationId }`
-* **`typing:stop`**: Báo đã dừng soạn thảo tin nhắn.
-  * Payload: `{ conversationId }`
-* **`presence:heartbeat`**: Định kỳ gửi để gia hạn TTL trạng thái online trong Redis (mặc định Redis key giữ 5 phút).
+Frontend thuong ket noi qua Gateway:
 
-#### Gọi điện WebRTC Signaling (Client → Server)
+- `ws://localhost:8080/chat/socket.io/`
 
-* **`call:initiate`**: Khởi tạo cuộc gọi video/audio tới người dùng khác.
-  * Payload: `{ targetUserId, callerName, callerAvatar, callType: "video" | "audio" }`
-* **`call:accept`**: Chấp nhận cuộc gọi đến.
-  * Payload: `{ callerId, calleeName, calleeAvatar }`
-* **`call:reject`**: Từ chối cuộc gọi đến.
-  * Payload: `{ callerId, reason: "rejected" | "busy" | "timeout" }`
-* **`call:end`**: Kết thúc cuộc gọi đang diễn ra.
-  * Payload: `{ targetUserId }`
-* **`webrtc:offer`**: Gửi SDP Offer cho đối phương (bước 1 WebRTC signaling).
-  * Payload: `{ targetUserId, sdp }`
-* **`webrtc:answer`**: Gửi SDP Answer cho đối phương (bước 2 WebRTC signaling).
-  * Payload: `{ targetUserId, sdp }`
-* **`webrtc:ice-candidate`**: Gửi ICE Candidate cho NAT traversal.
-  * Payload: `{ targetUserId, candidate }`
+Neu ket noi truc tiep service:
 
-### Server → Client (Sự kiện nhận về)
+- `ws://localhost:5004/socket.io/`
 
-* **`message:received`**: Phát tin nhắn mới đến toàn bộ phòng chat `conv:{conversationId}`.
-  * Payload: `{ _id, conversationId, senderId, senderName, senderAvatar, content, type, mediaUrl, readBy, createdAt }`
-* **`message:read:ack`**: Phát thông báo xác nhận tin nhắn đã được đối phương đọc.
-  * Payload: `{ conversationId, messageId, readBy, readAt }`
-* **`typing:indicator`**: Phát trạng thái soạn thảo cho các thành viên khác trong phòng.
-  * Payload: `{ conversationId, userId, displayName, isTyping }`
-* **`user:online`**: Thông báo người dùng trong cuộc hội thoại đã truy cập online.
-  * Payload: `{ userId }`
-* **`user:offline`**: Thông báo người dùng trong cuộc hội thoại đã ngắt kết nối (offline).
-  * Payload: `{ userId }`
+Auth truyen qua handshake token bearer.
 
-#### Gọi điện WebRTC Signaling (Server → Client)
+## Socket events
 
-* **`call:incoming`**: Thông báo có cuộc gọi đến (gửi tới personal room `user:{userId}`).
-  * Payload: `{ callerId, callerName, callerAvatar, callType }`
-* **`call:accepted`**: Thông báo đối phương đã chấp nhận cuộc gọi.
-  * Payload: `{ calleeId, calleeName, calleeAvatar }`
-* **`call:rejected`**: Thông báo đối phương từ chối hoặc không khả dụng.
-  * Payload: `{ calleeId, reason }`
-* **`call:ended`**: Thông báo cuộc gọi đã kết thúc bởi phía đối phương.
-  * Payload: `{ userId }`
-* **`webrtc:offer`**: Chuyển tiếp SDP Offer từ người gọi.
-  * Payload: `{ senderId, sdp }`
-* **`webrtc:answer`**: Chuyển tiếp SDP Answer từ người nhận.
-  * Payload: `{ senderId, sdp }`
-* **`webrtc:ice-candidate`**: Chuyển tiếp ICE Candidate.
-  * Payload: `{ senderId, candidate }`
-* **`error`**: Trả về thông báo lỗi khi xử lý sự kiện socket thất bại.
-  * Payload: `{ message }`
+### Messaging va presence
 
----
+- `message:send`
+- `message:read`
+- `typing:start`
+- `typing:stop`
+- `presence:heartbeat`
+- `message:received`
+- `message:read:ack`
+- `typing:indicator`
+- `user:online`
+- `user:offline`
 
-## Redis Pub/Sub Events (Published)
+### Call 1-1
 
-Dịch vụ phát hành các sự kiện bất đồng bộ lên Redis Pub/Sub để `notification-service` tiêu thụ (consume) và đẩy thông báo:
+Client -> server:
 
-1. **Kênh `message.sent`** *(Phát khi người nhận tin nhắn đang offline)*:
-   ```json
-   {
-     "eventId": "uuid",
-     "senderId": "string",
-     "conversationId": "string",
-     "recipientId": "string",
-     "preview": "string",
-     "occurredAt": "ISO8601 string"
-   }
-   ```
-2. **Kênh `group.member.added`** *(Phát khi có thành viên mới được thêm vào nhóm)*:
-   ```json
-   {
-     "eventId": "uuid",
-     "groupId": "string",
-     "groupName": "string",
-     "addedUserId": "string",
-     "addedByUserId": "string",
-     "occurredAt": "ISO8601 string"
-   }
-   ```
+- `call:initiate`
+- `call:accept`
+- `call:reject`
+- `call:end`
+- `webrtc:offer`
+- `webrtc:answer`
+- `webrtc:ice-candidate`
 
----
+Server -> client:
 
-## Environment Variables
+- `call:incoming`
+- `call:accepted`
+- `call:rejected`
+- `call:ended`
+- `webrtc:offer`
+- `webrtc:answer`
+- `webrtc:ice-candidate`
 
-| Variable | Description | Local Fallback | Docker / K8s (Container Network) |
-|---|---|---|---|
-| `PORT` | Cổng HTTP / Socket.IO server | `5004` | `5000` (hoặc `5004`) |
-| `MONGO_URI` | Chuỗi kết nối MongoDB | `mongodb://socialhub:socialhub_secret@localhost:27018/socialhub_chat?authSource=admin` | `mongodb://socialhub:socialhub_secret@mongo:27017/socialhub_chat?authSource=admin` |
-| `REDIS_URL` | Chuỗi kết nối Redis Cache & Pub/Sub | `redis://localhost:6379` | `redis://redis:6379` |
-| `JWT_SECRET` | Khóa bí mật dùng giải mã Token JWT | `your-jwt-secret-change-in-production` | Được inject qua Secret / `.env` |
-| `USER_SERVICE_URL` | URL gọi REST API nội bộ `user-service` | `http://localhost:5001` | `http://user-service:5000` |
-| `MEDIA_SERVICE_URL` | URL gọi REST API nội bộ `media-service` | `http://localhost:5005` | `http://media-service:5000` |
+### Group call
 
----
+Hien tai service ho tro room event cho group call:
 
-## Running Locally
+- `group-call:join`
+- `group-call:joined-room`
+- `group-call:user-joined`
+- `group-call:user-left`
+- `group-call:leave`
 
-### 1. Chạy qua Docker Compose (Khuyên dùng)
+Ngoai ra `call:initiate` cung ho tro payload group voi:
+
+- `targetUserIds`
+- `groupId`
+- `groupName`
+- `groupAvatar`
+- `isGroup`
+
+## Kien truc Video Call
+
+- `chat-service` chi lam signaling
+- media audio/video khong di qua backend nay
+- frontend tao `RTCPeerConnection`
+- neu P2P that bai, TURN server se relay media
+
+Tai lieu chi tiet:
+
+- [../../docs/video-call-turn-server.md](../../docs/video-call-turn-server.md)
+
+## Redis events
+
+Service publish len Redis:
+
+- `message.sent`
+- `group.member.added`
+
+Muc dich chinh la de `notification-service` tieu thu va day thong bao.
+
+## Bien moi truong quan trong
+
+| Variable | Default / y nghia |
+| --- | --- |
+| `PORT` | `5000` |
+| `MONGO_URI` | MongoDB cho chat |
+| `REDIS_URL` | Redis cho presence + pub/sub |
+| `JWT_SECRET` | dung verify JWT |
+| `USER_SERVICE_URL` | REST sang user-service |
+| `MEDIA_SERVICE_URL` | REST sang media-service |
+| `TURN_URL` | URL TURN server |
+| `TURN_USERNAME` | user TURN |
+| `TURN_CREDENTIAL` | password / credential TURN |
+
+## Chay local
+
 ```bash
-# Từ thư mục gốc của dự án
-docker compose up chat-service --build
-```
-
-### 2. Chạy Standalone (Local Development)
-Yêu cầu đã có MongoDB và Redis chạy trên máy cục bộ (hoặc qua Docker infra).
-```bash
-# Di chuyển vào thư mục dịch vụ
 cd services/chat-service
-
-# Cài đặt dependency & chạy ở chế độ phát triển (nodemon)
 npm install
 npm run dev
 ```
 
----
+Kiem tra nhanh:
 
-## Project Structure
+```bash
+curl http://localhost:5004/health
+curl -H "Authorization: Bearer <token>" http://localhost:5004/conversations/ice-servers
+```
 
-```
-chat-service/
-├── Dockerfile
-├── .dockerignore
-├── package.json
-├── readme.md
-└── src/
-    ├── app.js                    # Khởi tạo Express app & middlewares
-    ├── server.js                 # Điểm khởi chạy HTTP Server + Socket.IO Server
-    ├── test-client.js            # Script mô phỏng Socket client để kiểm thử
-    ├── config/
-    │   ├── index.js              # Đọc & quản lý các biến môi trường
-    │   ├── db.js                 # Kết nối MongoDB qua Mongoose
-    │   └── redis.js              # Khởi tạo Redis Clients (Cache & Publisher)
-    ├── controllers/
-    │   ├── conversation.controller.js # Xử lý request HTTP hội thoại
-    │   └── group.controller.js        # Xử lý request HTTP nhóm chat
-    ├── middleware/
-    │   └── auth.js               # Middleware xác thực JWT / Headers từ Gateway
-    ├── models/
-    │   ├── conversation.model.js # Mongoose Schema: Cuộc hội thoại (1-1 & Group)
-    │   ├── group.model.js        # Mongoose Schema: Thông tin nhóm chat
-    │   └── message.model.js      # Mongoose Schema: Tin nhắn & trạng thái đã đọc
-    ├── routes/
-    │   ├── conversation.routes.js # Định tuyến REST API hội thoại
-    │   └── group.routes.js        # Định tuyến REST API nhóm chat
-    ├── services/
-    │   ├── conversation.service.js# Logic nghiệp vụ cuộc hội thoại
-    │   ├── group.service.js       # Logic nghiệp vụ nhóm chat
-    │   └── message.service.js      # Logic truy vấn lịch sử tin nhắn
-    ├── socket/
-    │   ├── index.js              # Khởi tạo Socket.IO & đính kèm Redis Adapter
-    │   ├── auth.handler.js       # Middleware xác thực Socket handshake JWT
-    │   ├── message.handler.js    # Xử lý sự kiện tin nhắn (send, read, join)
-    │   ├── presence.handler.js   # Xử lý trạng thái online/offline & heartbeat
-    │   ├── typing.handler.js     # Xử lý chỉ báo đang soạn tin (typing indicator)
-    │   └── call.handler.js       # Xử lý signaling cuộc gọi Video/Audio (WebRTC)
-    └── utils/
-        ├── api.js                # Helper gọi REST API inter-service (user-service, media-service)
-        ├── error.js              # Định nghĩa các lớp Error tuỳ chỉnh (HttpError)
-        └── response.js           # Helper chuẩn hoá định dạng HTTP response
-```
+## File lien quan
+
+- routes: [src/routes/conversation.routes.js](./src/routes/conversation.routes.js)
+- controller: [src/controllers/conversation.controller.js](./src/controllers/conversation.controller.js)
+- signaling: [src/socket/call.handler.js](./src/socket/call.handler.js)
+- OpenAPI: [../../docs/api-specs/chat-service.yaml](../../docs/api-specs/chat-service.yaml)
