@@ -173,13 +173,17 @@ const api = axios.create({
 });
 ```
 
-### Request Interceptor (Tự động đính kèm Access Token)
+### Request Interceptor (Tự động đính kèm Access Token & Cấu hình Upload)
 
 ```
 Mọi request HTTP gửi đi
   ├── Kiểm tra localStorage có "accessToken"?
   │     ├── CÓ → Đính kèm header: Authorization: Bearer <token>
   │     └── KHÔNG → Gửi request bình thường (không có token)
+  ├── Kiểm tra loại dữ liệu gửi đi (config.data):
+  │     └── Nếu là FormData hoặc url chứa /media/upload:
+  │           ├── Xóa header Content-Type để trình duyệt tự thiết lập boundary
+  │           └── Thiết lập timeout = 0 (vô hiệu hóa timeout) để hỗ trợ upload video lớn và transcode ngầm
   └── Gửi request tới API Gateway
 ```
 
@@ -1083,6 +1087,21 @@ ChatImage({ mediaId })
   ├── GET fullUrl (responseType: "blob") → tải blob
   └── URL.createObjectURL(blob) → <img>
 ```
+
+### 9.7 HlsVideoPlayer — Phát video HLS & Tối ưu hóa
+
+**File:** `src/components/HlsVideoPlayer.jsx`
+
+**Vai trò:** Phát các file video định dạng HLS (`.m3u8`) hoặc tự động fallback sang định dạng MP4 nếu HLS chưa sẵn sàng.
+
+**Cơ chế tối ưu hóa hiệu năng (Lazy Loading & Socket Cleanup):**
+1. **Lazy Loading theo trạng thái active**: Đối với các video trong danh sách Reels, đầu chơi (HlsVideoPlayer) chỉ bắt đầu tải playlist và nạp phân đoạn `.ts` khi Reel đó thực sự đang active (`isActive === true`). Điều này ngăn chặn việc trình duyệt tải song song hàng chục phân đoạn video ở chế độ nền, loại bỏ hiện tượng nghẽn mạng.
+2. **Giải phóng Socket & RAM tức thì**: Khi cuộn Reel qua trang khác hoặc khi player unmount, component sẽ thực hiện dọn dẹp:
+   - Hủy thực thể Hls (`hls.destroy()`).
+   - Dừng phát video (`video.pause()`).
+   - Xóa thuộc tính `src` (`video.removeAttribute('src')`).
+   - Buộc trình duyệt giải phóng bộ nhớ đệm và các kết nối mạng đang mở (`video.load()`).
+3. **Stream MP4 trực tiếp**: Nếu HLS chưa sẵn sàng (trả về 404), player tự động phát bằng file MP4 gốc. Đối với môi trường localhost/không có ngrok, video MP4 sẽ được stream trực tiếp qua HTTP range request thay vì phải tải toàn bộ file thành bộ nhớ đệm Blob, giúp bắt đầu phát chỉ trong vài mili-giây.
 
 ---
 

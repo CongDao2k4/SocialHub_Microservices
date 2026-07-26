@@ -63,7 +63,7 @@ Gateway khong tu xu ly file media. No chi stream lai tu `media-service`.
 
 Trang thai hien tai:
 
-- media upload video co the cho den khi HLS transcode xong moi tra `201`
+- media upload video duoc xu ly bat dong bo (asynchronous) giup API tra ve HTTP status `201` ngay lap tuc sau khi luu video goc, giam thieu treo request.
 - public HLS playlist va segment di qua:
   - `/api/media/hls/:id/index.m3u8`
   - `/api/media/hls/:id/:segment`
@@ -71,6 +71,7 @@ Trang thai hien tai:
   - `ECONNRESET`
   - `ERR_STREAM_PREMATURE_CLOSE`
 - media circuit breaker timeout mac dinh da tang len `180000ms` de du cho upload video + FFmpeg HLS
+- CORS Gateway duoc cau hinh de cho phep header `Range` va expose cac header `Accept-Ranges`, `Content-Range`. Dieu nay cho phep cac client o domain ngoai (nhu Vercel) co the gui request phan doan va stream video muot ma ma khong bi chan CORS.
 
 ## Circuit breaker
 
