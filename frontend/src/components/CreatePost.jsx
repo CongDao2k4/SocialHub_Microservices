@@ -7,6 +7,7 @@ import { compressImageBeforeUpload } from "../utils/imageCompressor";
 const CreatePost = ({ onPostCreated }) => {
     const { user } = useAuth();
     const [content, setContent] = useState("");
+    const [visibility, setVisibility] = useState("public");
     const [selectedFiles, setSelectedFiles] = useState([]); // [{ id, file, previewUrl, isVideo }]
     const [isUploading, setIsUploading] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -76,11 +77,12 @@ const CreatePost = ({ onPostCreated }) => {
             const postRes = await api.post("/posts", {
                 content,
                 mediaIds,
-                visibility: "friends"
+                visibility
             });
 
             if (postRes.data && postRes.data.success) {
                 setContent("");
+                setVisibility("public");
                 // Clear previews
                 selectedFiles.forEach((item) => URL.revokeObjectURL(item.previewUrl));
                 setSelectedFiles([]);
@@ -146,16 +148,28 @@ const CreatePost = ({ onPostCreated }) => {
                         onChange={handleFilesChange}
                         className="hidden"
                     />
-                    <button
-                        type="button"
-                        onClick={() => fileInputRef.current?.click()}
-                        disabled={isSubmitting}
-                        className="flex items-center space-x-1.5 sm:space-x-2 px-3 sm:px-4 py-2 bg-slate-50 hover:bg-slate-100 rounded-xl text-slate-650 border border-slate-200 transition cursor-pointer disabled:opacity-50 text-xs sm:text-sm font-medium"
-                    >
-                        <Image className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-500" />
-                        <Video className="w-4 h-4 sm:w-5 sm:h-5 text-blue-600" />
-                        <span>Ảnh / Video</span>
-                    </button>
+                    <div className="flex items-center space-x-2">
+                        {/* Selector cho Quyền riêng tư */}
+                        <select
+                            value={visibility}
+                            onChange={(e) => setVisibility(e.target.value)}
+                            className="bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs sm:text-sm font-semibold text-slate-650 cursor-pointer outline-none focus:ring-1 focus:ring-blue-500 transition"
+                        >
+                            <option value="public">🌍 Công khai</option>
+                            <option value="friends">👥 Bạn bè</option>
+                        </select>
+
+                        <button
+                            type="button"
+                            onClick={() => fileInputRef.current?.click()}
+                            disabled={isSubmitting}
+                            className="flex items-center space-x-1.5 sm:space-x-2 px-3 sm:px-4 py-2 bg-slate-50 hover:bg-slate-100 rounded-xl text-slate-650 border border-slate-200 transition cursor-pointer disabled:opacity-50 text-xs sm:text-sm font-medium"
+                        >
+                            <Image className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-500" />
+                            <Video className="w-4 h-4 sm:w-5 sm:h-5 text-blue-600" />
+                            <span>Ảnh / Video</span>
+                        </button>
+                    </div>
 
                     {/* Nút Đăng Bài */}
                     <button

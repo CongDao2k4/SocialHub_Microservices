@@ -380,12 +380,16 @@ const PostCard = ({post, currentUserId, onPostShared, onPostDeleted, onPostUpdat
         }
     };
 
+    const authorProfilePath = post.group_id 
+        ? `/groups/${post.group_id}/user/${post.author_id}` 
+        : `/profile/${post.author_id}`;
+
     return (
         <div className="bg-white border border-slate-200 rounded-xl md:rounded-2xl p-4 md:p-6 shadow-sm mb-4 md:mb-6">
             {/* Header: Thông tin tác giả - Click để về trang cá nhân */}
             <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center space-x-3">
-                    <Link to={`/profile/${post.author_id}`} className="block group">
+                    <Link to={authorProfilePath} className="block group">
                         <img
                             src={post.author?.avatarUrl || "https://api.dicebear.com/7.x/adventurer/svg?seed=Felix"}
                             alt="Author Avatar"
@@ -394,7 +398,7 @@ const PostCard = ({post, currentUserId, onPostShared, onPostDeleted, onPostUpdat
                     </Link>
                     <div>
                         <div className="flex items-center flex-wrap gap-1">
-                            <Link to={`/profile/${post.author_id}`} className="font-semibold text-slate-800 text-sm hover:text-blue-600 transition">
+                            <Link to={authorProfilePath} className="font-semibold text-slate-800 text-sm hover:text-blue-600 transition">
                                 {post.author?.displayName || "Người dùng SocialHub"}
                             </Link>
                             {post.group && (

@@ -141,6 +141,7 @@ export const getGroupPosts = async (req, res) => {
     const limit = parseInt(req.query.limit) || 10;
     const offset = parseInt(req.query.offset) || 0;
     const status = req.query.status || 'approved';
+    const authorId = req.query.authorId;
 
     const result = await groupService.getGroupPosts(
       req.params.id,
@@ -148,7 +149,8 @@ export const getGroupPosts = async (req, res) => {
       limit,
       offset,
       req.user.id,
-      req.headers.authorization
+      req.headers.authorization,
+      authorId
     );
     return successResponse(res, 200, result);
   } catch (error) {

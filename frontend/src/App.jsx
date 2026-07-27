@@ -15,6 +15,7 @@ import PostDetail from "./pages/PostDetail";
 import Reels from "./pages/Reels";
 import Groups from "./pages/Groups";
 import GroupDetail from "./pages/GroupDetail";
+import GroupUserProfile from "./pages/GroupUserProfile";
 
 function App() {
   return (
@@ -39,6 +40,7 @@ function App() {
               <Route path="/reels" element={<Reels />} />
               <Route path="/groups" element={<Groups />} />
               <Route path="/groups/:id" element={<GroupDetail />} />
+              <Route path="/groups/:groupId/user/:userId" element={<GroupUserProfile />} />
             </Route>
           </Route>
 
