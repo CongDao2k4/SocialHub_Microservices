@@ -125,17 +125,6 @@ const Layout = () => {
                             <Layers className={navIconClass("/groups")} />
                             <span>Nhóm</span>
                         </Link>
-                        <Link to="/notifications" className={`${navLinkClass("/notifications")} justify-between`}>
-                            <div className="flex items-center space-x-3">
-                                <Bell className={navIconClass("/notifications")} />
-                                <span>Thông báo</span>
-                            </div>
-                            {unreadCount > 0 && (
-                                <span className="bg-red-500 text-white font-bold text-[10px] px-2 py-0.5 rounded-full min-w-[20px] text-center">
-                                    {unreadCount}
-                                </span>
-                            )}
-                        </Link>
                     </nav>
                 </div>
 
