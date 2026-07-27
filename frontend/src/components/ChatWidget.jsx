@@ -87,15 +87,34 @@ const ChatWidget = () => {
         setOpenChats(prev => prev.filter(c => (c._id !== conversationId && c.id !== conversationId)));
     };
 
-    // 4. Lắng nghe sự kiện "open-chat" từ các trang khác (như Trang cá nhân)
+    // 4. Lắng nghe sự kiện "open-chat" và "open-chat-conversation" từ các trang khác
     useEffect(() => {
         const handleOpenChatEvent = (e) => {
             const friend = e.detail;
             handleOpenChat(friend);
         };
+
+        const handleOpenConversationEvent = (e) => {
+            const conversation = e.detail;
+            if (conversation) {
+                setOpenChats(prev => {
+                    const convId = conversation._id || conversation.id;
+                    if (prev.some(c => (c._id || c.id) === convId)) return prev;
+                    const newChats = [...prev, conversation];
+                    if (newChats.length > 3) newChats.shift();
+                    return newChats;
+                });
+            }
+        };
+
         window.addEventListener("open-chat", handleOpenChatEvent);
-        return () => window.removeEventListener("open-chat", handleOpenChatEvent);
+        window.addEventListener("open-chat-conversation", handleOpenConversationEvent);
+        return () => {
+            window.removeEventListener("open-chat", handleOpenChatEvent);
+            window.removeEventListener("open-chat-conversation", handleOpenConversationEvent);
+        };
     }, [openChats]);
+
 
     // 5. Lắng nghe tin nhắn mới từ chatSocket để tự động bật popup ChatBox
     useEffect(() => {

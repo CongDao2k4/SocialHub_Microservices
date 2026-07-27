@@ -266,6 +266,11 @@ const Profile = () => {
     const isOwnProfile = loggedInUser?.id === id;
     const coverInputRef = useRef(null);
     const [isUploadingCover, setIsUploadingCover] = useState(false);
+    const [coverError, setCoverError] = useState(false);
+
+    useEffect(() => {
+        setCoverError(false);
+    }, [profileUser?.coverUrl]);
 
     const handleCoverChange = async (e) => {
         const file = e.target.files[0];
@@ -282,18 +287,28 @@ const Profile = () => {
                     });
                 } catch (err) {
                     console.warn("[COMPRESS] Cover fallback:", err.message);
+                    fileToUpload = file;
                 }
             }
             const formData = new FormData();
             formData.append("file", fileToUpload);
             const uploadRes = await api.post("/media/upload", formData);
+
             if (uploadRes.data && uploadRes.data.id) {
-                const newCoverUrl = `${api.defaults.baseURL}/media/file/${uploadRes.data.id}?variant=original`;
-                setProfileUser(prev => ({...prev, coverUrl: newCoverUrl}));
-                if (loggedInUser?.id === profileUser.id && setUser) {
-                    setUser({...loggedInUser, coverUrl: newCoverUrl});
+                const relativeCoverUrl = `/media/file/${uploadRes.data.id}`;
+                setCoverError(false);
+
+                const updateRes = await api.put(`/users/${profileUser.id}`, {
+                    coverUrl: relativeCoverUrl
+                });
+
+                if (updateRes.data && updateRes.data.user) {
+                    const updatedUser = updateRes.data.user;
+                    setProfileUser(prev => ({...prev, ...updatedUser}));
+                    if (loggedInUser?.id === profileUser.id && setUser) {
+                        setUser(prev => ({...prev, ...updatedUser}));
+                    }
                 }
-                await api.put(`/users/${profileUser.id}`, {coverUrl: newCoverUrl}).catch(() => { });
             }
         } catch (err) {
             console.error("❌ Lỗi tải lên ảnh bìa:", err);
@@ -428,11 +443,12 @@ const Profile = () => {
             <div className="relative bg-white border border-slate-200 rounded-2xl md:rounded-3xl overflow-hidden shadow-sm">
                 {/* Banner Ảnh Bìa (Cover Photo) */}
                 <div className="relative h-44 md:h-56 w-full bg-gradient-to-r from-blue-600 via-indigo-600 to-violet-700 overflow-hidden">
-                    {profileUser.coverUrl ? (
+                    {profileUser.coverUrl && !coverError ? (
                         <img
                             src={profileUser.coverUrl}
                             alt="Cover Banner"
                             className="w-full h-full object-cover"
+                            onError={() => setCoverError(true)}
                         />
                     ) : (
                         <div className="absolute inset-0 bg-gradient-to-r from-blue-600 via-indigo-600 to-violet-700 flex items-center justify-center">

@@ -2,6 +2,7 @@ import {Outlet, Link, useNavigate, useLocation} from "react-router-dom";
 import {useAuth} from "../context/AuthContext";
 import {useSocket} from "../context/SocketContext";
 import ChatWidget from "./ChatWidget"; // <-- Import thêm ChatWidget
+import TopHeaderNav from "./TopHeaderNav";
 import {Home, Users, User, LogOut, Bell, MessageSquare, Film} from "lucide-react";
 const Layout = () => {
     const { user, logout } = useAuth();
@@ -202,10 +203,15 @@ const Layout = () => {
 
             {/* Nội dung chính bên phải */}
             <main className={`flex-1 ml-0 md:ml-64 lg:mr-64 ${
-                isMessagesPage ? "pt-14 pb-16 md:pt-8 md:pb-8 p-2 md:p-4 min-h-screen" : 
-                isReelsPage ? "fixed inset-0 top-14 bottom-16 md:static md:min-h-screen md:pt-8 md:pb-8 p-0 md:p-8" : 
-                "pt-16 pb-20 md:pt-8 md:pb-8 p-3 sm:p-6 md:p-8 min-h-screen"
+                isMessagesPage ? "pt-14 pb-16 md:pt-4 md:pb-8 p-2 md:p-4 min-h-screen" : 
+                isReelsPage ? "fixed inset-0 top-14 bottom-16 md:static md:min-h-screen md:pt-4 md:pb-8 p-0 md:p-8" : 
+                "pt-16 pb-20 md:pt-4 md:pb-8 p-3 sm:p-6 md:p-8 min-h-screen"
             }`}>
+                {/* Header Actions Bar (Khoanh đỏ: Bạn bè -> Tin nhắn -> Thông báo Dropdowns) */}
+                <div className="hidden md:flex items-center justify-end mb-5 sticky top-0 py-2.5 px-4 bg-slate-50/90 backdrop-blur-md z-30 rounded-2xl border border-slate-200/50 shadow-xs">
+                    <TopHeaderNav />
+                </div>
+
                 <div className={isMessagesPage ? "w-full h-full" : isReelsPage ? "w-full h-full flex justify-center items-center" : "max-w-4xl mx-auto"}>
                     <Outlet /> {/* Nơi các trang con hiển thị */}
                 </div>

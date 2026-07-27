@@ -61,9 +61,7 @@ const CreatePost = ({ onPostCreated }) => {
 
                     const formData = new FormData();
                     formData.append("file", fileToUpload);
-                    const res = await api.post("/media/upload", formData, {
-                        headers: { "Content-Type": "multipart/form-data" }
-                    });
+                    const res = await api.post("/media/upload", formData);
                     return res.data?.id;
                 });
 

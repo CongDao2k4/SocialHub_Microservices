@@ -318,9 +318,7 @@ const ChatBox = ({ conversation, onClose, currentUserId }) => {
             formData.append("file", file);
 
             // Upload audio lên media-service
-            const res = await api.post("/media/upload", formData, {
-                headers: { "Content-Type": "multipart/form-data" }
-            });
+            const res = await api.post("/media/upload", formData);
 
             const mId = res.data?.id;
             if (mId) {
