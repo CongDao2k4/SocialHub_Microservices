@@ -10,12 +10,28 @@ import HlsVideoPlayer from "./HlsVideoPlayer";
 import {useAuth} from "../context/AuthContext"; // <-- Import useAuth
 import {formatRelativeTime} from "../utils/dateUtils";
 
+const REACTION_OPTIONS = [
+    { id: "like", label: "Thích", emoji: "👍", color: "text-blue-600", bg: "bg-blue-50" },
+    { id: "love", label: "Yêu thích", emoji: "❤️", color: "text-rose-600", bg: "bg-rose-50" },
+    { id: "haha", label: "Haha", emoji: "😆", color: "text-amber-500", bg: "bg-amber-50" },
+    { id: "wow", label: "Wow", emoji: "😮", color: "text-amber-500", bg: "bg-amber-50" },
+    { id: "sad", label: "Buồn", emoji: "😢", color: "text-amber-500", bg: "bg-amber-50" },
+    { id: "angry", label: "Phẫn nộ", emoji: "😡", color: "text-red-600", bg: "bg-red-50" },
+];
+
 const PostCard = ({post, currentUserId, onPostShared, onPostDeleted, onPostUpdated}) => {
     const {user: currentUser} = useAuth(); // Lấy thông tin user hiện tại
     const [showEditModal, setShowEditModal] = useState(false);
     const [lightboxData, setLightboxData] = useState(null); // { items: [...], index: 0 }
     const [isLiked, setIsLiked] = useState(post.isLikedByMe || false);
     const [likeCount, setLikeCount] = useState(post.like_count ?? post.likeCount ?? 0);
+    const [selectedReaction, setSelectedReaction] = useState(post.isLikedByMe ? REACTION_OPTIONS[0] : null);
+    const [showReactionPicker, setShowReactionPicker] = useState(false);
+    const [showReactorsPopover, setShowReactorsPopover] = useState(false);
+    const [reactorsList, setReactorsList] = useState([]);
+    const [isLoadingReactors, setIsLoadingReactors] = useState(false);
+    const reactionPickerTimer = useRef(null);
+    const reactorsTimer = useRef(null);
     const [commentCount, setCommentCount] = useState(post.comment_count ?? post.commentCount ?? 0);
     const [shareCount, setShareCount] = useState(post.share_count ?? post.shareCount ?? 0);
     const [imageUrl, setImageUrl] = useState("");
@@ -274,16 +290,94 @@ const PostCard = ({post, currentUserId, onPostShared, onPostDeleted, onPostUpdat
         }
     }, [showComments, post.id]);
 
-    // 4. Thích / Bỏ thích bài đăng
-    const handleLike = async () => {
+    // 4. Tải danh sách người đã thả cảm xúc (Reactors)
+    const fetchReactors = async () => {
+        if (isLoadingReactors) return;
+        setIsLoadingReactors(true);
         try {
-            const res = await api.post(`/posts/${post.id}/like`);
+            const res = await api.get(`/posts/${post.id}/likes`);
             if (res.data && res.data.success) {
-                setIsLiked(!isLiked);
-                setLikeCount(prev => (isLiked ? prev - 1 : prev + 1));
+                setReactorsList(res.data.data || []);
             }
         } catch (error) {
-            console.error("❌ Lỗi thích bài viết:", error);
+            console.error("❌ Lỗi lấy danh sách người thả cảm xúc:", error);
+        } finally {
+            setIsLoadingReactors(false);
+        }
+    };
+
+    // Xử lý hover vào nút Thích / số lượt thích để hiện danh sách người tương tác
+    const handleMouseEnterReactors = () => {
+        clearTimeout(reactorsTimer.current);
+        reactorsTimer.current = setTimeout(() => {
+            setShowReactorsPopover(true);
+            fetchReactors();
+        }, 300);
+    };
+
+    const handleMouseLeaveReactors = () => {
+        clearTimeout(reactorsTimer.current);
+        reactorsTimer.current = setTimeout(() => {
+            setShowReactorsPopover(false);
+        }, 300);
+    };
+
+    // Xử lý hover vào nút Thích để hiện thanh Reaction Emojis kiểu Facebook
+    const handleMouseEnterLike = () => {
+        clearTimeout(reactionPickerTimer.current);
+        reactionPickerTimer.current = setTimeout(() => {
+            setShowReactionPicker(true);
+        }, 350);
+        handleMouseEnterReactors();
+    };
+
+    const handleMouseLeaveLike = () => {
+        clearTimeout(reactionPickerTimer.current);
+        reactionPickerTimer.current = setTimeout(() => {
+            setShowReactionPicker(false);
+        }, 400);
+        handleMouseLeaveReactors();
+    };
+
+    // Thích / Bỏ thích cơ bản khi click nút Like
+    const handleLike = async () => {
+        try {
+            if (isLiked) {
+                const res = await api.delete(`/posts/${post.id}/like`);
+                if (res.data && res.data.success) {
+                    setIsLiked(false);
+                    setSelectedReaction(null);
+                    setLikeCount(prev => Math.max(0, prev - 1));
+                }
+            } else {
+                const res = await api.post(`/posts/${post.id}/like`);
+                if (res.data && res.data.success) {
+                    setIsLiked(true);
+                    setSelectedReaction(REACTION_OPTIONS[0]);
+                    setLikeCount(prev => prev + 1);
+                }
+            }
+        } catch (error) {
+            console.error("❌ Lỗi thả cảm xúc bài viết:", error);
+        }
+    };
+
+    // Chọn cảm xúc cụ thể (Thích, Yêu thích, Haha, Wow, Buồn, Phẫn nộ)
+    const handleSelectReaction = async (reaction) => {
+        setShowReactionPicker(false);
+        try {
+            if (!isLiked) {
+                const res = await api.post(`/posts/${post.id}/like`);
+                if (res.data && res.data.success) {
+                    setIsLiked(true);
+                    setSelectedReaction(reaction);
+                    setLikeCount(prev => prev + 1);
+                }
+            } else {
+                setSelectedReaction(reaction);
+            }
+        } catch (error) {
+            console.error("❌ Lỗi thả cảm xúc:", error);
         }
     };
 
@@ -510,15 +604,102 @@ const PostCard = ({post, currentUserId, onPostShared, onPostDeleted, onPostUpdat
             )}
 
             {/* Footer tương tác */}
-            <div className="flex items-center justify-around sm:justify-between pt-3 sm:pt-4 border-t border-slate-100 text-slate-500 text-xs md:text-sm select-none">
-                {/* Nút Thích */}
-                <button
-                    onClick={handleLike}
-                    className={`flex items-center justify-center space-x-1.5 sm:space-x-2 py-2 px-3 sm:px-4 rounded-xl hover:bg-rose-50 hover:text-rose-500 transition cursor-pointer active:scale-95 ${isLiked ? "text-rose-600 font-bold bg-rose-50/50" : ""}`}
+            <div className="flex items-center justify-around sm:justify-between pt-3 sm:pt-4 border-t border-slate-100 text-slate-500 text-xs md:text-sm select-none relative">
+                {/* Nút Thích & Reaction Bar Facebook */}
+                <div 
+                    className="relative"
+                    onMouseEnter={handleMouseEnterLike}
+                    onMouseLeave={handleMouseLeaveLike}
                 >
-                    <Heart className={`w-4 h-4 sm:w-5 sm:h-5 ${isLiked ? "fill-rose-600" : ""}`} />
-                    <span>{likeCount} <span className="inline">Thích</span></span>
-                </button>
+                    {/* Bảng Popup danh sách người tương tác khi trỏ chuột vào */}
+                    {showReactorsPopover && (
+                        <div 
+                            onMouseEnter={() => clearTimeout(reactorsTimer.current)}
+                            onMouseLeave={handleMouseLeaveReactors}
+                            className="absolute bottom-full mb-3 left-0 w-64 bg-white border border-slate-200 rounded-2xl shadow-2xl z-40 p-3 animate-in fade-in slide-in-from-bottom-2 duration-200"
+                        >
+                            <div className="flex items-center justify-between border-b border-slate-100 pb-2 mb-2">
+                                <span className="font-bold text-xs text-slate-800 flex items-center space-x-1">
+                                    <span>❤️👍 Người tương tác</span>
+                                    <span className="text-slate-400 font-normal">({likeCount})</span>
+                                </span>
+                            </div>
+
+                            <div className="max-h-48 overflow-y-auto space-y-2 pr-1">
+                                {isLoadingReactors ? (
+                                    <div className="p-4 flex items-center justify-center text-slate-400">
+                                        <Loader className="w-4 h-4 animate-spin text-blue-600 mr-2" />
+                                        <span className="text-xs">Đang tải danh sách...</span>
+                                    </div>
+                                ) : reactorsList.length === 0 ? (
+                                    <p className="text-xs text-slate-400 text-center py-3">Chưa có người dùng nào thả cảm xúc.</p>
+                                ) : (
+                                    reactorsList.map((item) => {
+                                        const reactor = item.user || {};
+                                        return (
+                                            <Link
+                                                key={item.id || item.user_id}
+                                                to={`/profile/${reactor.id || item.user_id}`}
+                                                className="flex items-center space-x-2.5 p-1.5 hover:bg-slate-50 rounded-xl transition group"
+                                            >
+                                                <img
+                                                    src={reactor.avatarUrl || "https://api.dicebear.com/7.x/adventurer/svg?seed=Felix"}
+                                                    className="w-7 h-7 rounded-full object-cover border border-slate-200 shrink-0"
+                                                    alt="Avatar"
+                                                />
+                                                <span className="text-xs font-semibold text-slate-700 group-hover:text-blue-600 truncate flex-1">
+                                                    {reactor.displayName || "Người dùng"}
+                                                </span>
+                                                <span className="text-xs">👍</span>
+                                            </Link>
+                                        );
+                                    })
+                                )}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Thanh Reaction Picker Bar kiểu Facebook */}
+                    {showReactionPicker && (
+                        <div 
+                            onMouseEnter={() => clearTimeout(reactionPickerTimer.current)}
+                            onMouseLeave={handleMouseLeaveLike}
+                            className="absolute bottom-full mb-2 left-0 bg-white/95 backdrop-blur-md border border-slate-200/90 rounded-full shadow-2xl p-1.5 flex items-center space-x-1 z-50 animate-in fade-in slide-in-from-bottom-3 duration-200 ring-1 ring-black/5"
+                        >
+                            {REACTION_OPTIONS.map((item) => (
+                                <button
+                                    key={item.id}
+                                    type="button"
+                                    onClick={() => handleSelectReaction(item)}
+                                    className="p-1.5 text-xl hover:scale-135 transition-all duration-200 cursor-pointer hover:bg-slate-100/80 rounded-full relative group"
+                                    title={item.label}
+                                >
+                                    <span>{item.emoji}</span>
+                                    <span className="absolute -top-7 left-1/2 -translate-x-1/2 bg-slate-900/90 text-white text-[10px] font-medium px-2 py-0.5 rounded-full opacity-0 group-hover:opacity-100 transition duration-150 pointer-events-none whitespace-nowrap shadow-md">
+                                        {item.label}
+                                    </span>
+                                </button>
+                            ))}
+                        </div>
+                    )}
+
+                    <button
+                        type="button"
+                        onClick={handleLike}
+                        className={`flex items-center justify-center space-x-1.5 sm:space-x-2 py-2 px-3 sm:px-4 rounded-xl transition cursor-pointer active:scale-95 ${
+                            isLiked
+                                ? `${selectedReaction?.bg || "bg-rose-50/50"} ${selectedReaction?.color || "text-rose-600"} font-bold`
+                                : "hover:bg-rose-50 hover:text-rose-500 text-slate-500"
+                        }`}
+                    >
+                        {isLiked && selectedReaction ? (
+                            <span className="text-base leading-none">{selectedReaction.emoji}</span>
+                        ) : (
+                            <Heart className={`w-4 h-4 sm:w-5 sm:h-5 ${isLiked ? "fill-rose-600 text-rose-600" : ""}`} />
+                        )}
+                        <span>{likeCount} <span className="inline">{selectedReaction?.label || "Thích"}</span></span>
+                    </button>
+                </div>
 
                 {/* Nút Bình luận */}
                 <button

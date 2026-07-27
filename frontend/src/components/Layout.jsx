@@ -3,7 +3,7 @@ import {useAuth} from "../context/AuthContext";
 import {useSocket} from "../context/SocketContext";
 import ChatWidget from "./ChatWidget"; // <-- Import thêm ChatWidget
 import TopHeaderNav from "./TopHeaderNav";
-import {Home, Users, User, LogOut, Bell, MessageSquare, Film} from "lucide-react";
+import {Home, Users, LogOut, Bell, MessageSquare, Film} from "lucide-react";
 const Layout = () => {
     const { user, logout } = useAuth();
     const { unreadCount, toast, setToast } = useSocket();
@@ -111,34 +111,15 @@ const Layout = () => {
                         </span>
                     </Link>
 
-                    {/* Navigation Links */}
-                    <nav className="space-y-1">
+                    {/* Navigation Links - Chỉ giữ các mục không có ở Top Header Nav */}
+                    <nav className="space-y-1.5">
                         <Link to="/" className={navLinkClass("/")}>
                             <Home className={navIconClass("/")} />
                             <span>Bảng tin</span>
                         </Link>
-                        <Link to="/friends" className={navLinkClass("/friends")}>
-                            <Users className={navIconClass("/friends")} />
-                            <span>Bạn bè</span>
-                        </Link>
-                        <Link to="/messages" className={navLinkClass("/messages")}>
-                            <MessageSquare className={navIconClass("/messages")} />
-                            <span>Tin nhắn</span>
-                        </Link>
                         <Link to="/reels" className={navLinkClass("/reels")}>
                             <Film className={navIconClass("/reels")} />
                             <span>Reels</span>
-                        </Link>
-                        <Link to="/notifications" className={`${navLinkClass("/notifications")} justify-between`}>
-                            <div className="flex items-center space-x-3">
-                                <Bell className={navIconClass("/notifications")} />
-                                <span>Thông báo</span>
-                            </div>
-                            {unreadCount > 0 && (
-                                <span className="bg-red-500 text-white font-bold text-[10px] px-2 py-0.5 rounded-full min-w-[20px] text-center">
-                                    {unreadCount}
-                                </span>
-                            )}
                         </Link>
                     </nav>
                 </div>
@@ -169,6 +150,12 @@ const Layout = () => {
                     </button>
                 </div>
             </aside>
+
+            {/* Top Navbar Header Cố Định (Desktop >= 768px) */}
+            <header className="hidden md:flex fixed top-0 right-0 left-64 h-14 bg-white/95 backdrop-blur-md border-b border-slate-200/80 px-6 items-center justify-end z-30 shadow-sm">
+                {/* Nhóm Icon Hành Động: Bạn bè -> Tin nhắn -> Thông báo */}
+                <TopHeaderNav />
+            </header>
 
             {/* Bottom Navigation Bar Mobile (Chỉ hiện trên di động < 768px) */}
             <nav className="md:hidden fixed bottom-0 inset-x-0 h-16 bg-white/95 backdrop-blur-md border-t border-slate-200/80 z-40 flex items-center justify-around px-2 shadow-lg active:touch-none select-none">
@@ -203,15 +190,10 @@ const Layout = () => {
 
             {/* Nội dung chính bên phải */}
             <main className={`flex-1 ml-0 md:ml-64 lg:mr-64 ${
-                isMessagesPage ? "pt-14 pb-16 md:pt-4 md:pb-8 p-2 md:p-4 min-h-screen" : 
-                isReelsPage ? "fixed inset-0 top-14 bottom-16 md:static md:min-h-screen md:pt-4 md:pb-8 p-0 md:p-8" : 
-                "pt-16 pb-20 md:pt-4 md:pb-8 p-3 sm:p-6 md:p-8 min-h-screen"
+                isMessagesPage ? "pt-14 pb-16 md:pt-14 md:pb-8 p-2 md:p-4 min-h-screen" : 
+                isReelsPage ? "fixed inset-0 top-14 bottom-16 md:static md:min-h-screen md:pt-14 md:pb-8 p-0 md:p-8" : 
+                "pt-16 pb-20 md:pt-16 md:pb-8 p-3 sm:p-6 md:p-8 min-h-screen"
             }`}>
-                {/* Header Actions Bar (Khoanh đỏ: Bạn bè -> Tin nhắn -> Thông báo Dropdowns) */}
-                <div className="hidden md:flex items-center justify-end mb-5 sticky top-0 py-2.5 px-4 bg-slate-50/90 backdrop-blur-md z-30 rounded-2xl border border-slate-200/50 shadow-xs">
-                    <TopHeaderNav />
-                </div>
-
                 <div className={isMessagesPage ? "w-full h-full" : isReelsPage ? "w-full h-full flex justify-center items-center" : "max-w-4xl mx-auto"}>
                     <Outlet /> {/* Nơi các trang con hiển thị */}
                 </div>

@@ -33,3 +33,15 @@ export const unlikePost = async (req, res) => {
     return handleError(res, error, 'Unlike Post Error');
   }
 };
+
+export const getPostLikes = async (req, res) => {
+  try {
+    const likes = await likeService.getPostLikes({
+      postId: req.params.id,
+      token: req.token
+    });
+    return successResponse(res, 200, likes);
+  } catch (error) {
+    return handleError(res, error, 'Get Post Likes Error');
+  }
+};

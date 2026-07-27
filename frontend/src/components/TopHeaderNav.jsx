@@ -99,8 +99,12 @@ const TopHeaderNav = () => {
         }
     };
 
-    // Lắng nghe sự kiện thông báo realtime
+    // Lắng nghe sự kiện thông báo & tin nhắn realtime và tải dữ liệu ban đầu
     useEffect(() => {
+        fetchFriendRequests();
+        fetchConversations();
+        fetchNotifications();
+
         const handleNewNotification = (e) => {
             const newNotif = e.detail;
             setNotifications(prev => {
@@ -111,6 +115,13 @@ const TopHeaderNav = () => {
         window.addEventListener("notification-received", handleNewNotification);
         return () => window.removeEventListener("notification-received", handleNewNotification);
     }, []);
+
+    // Tính số lượng cuộc trò chuyện chưa đọc
+    const unreadMessagesCount = conversations.reduce((acc, conv) => {
+        const isUnread = conv.unreadCount > 0 || conv.isUnread || 
+            (conv.lastMessage && !conv.lastMessage.isRead && (conv.lastMessage.senderId || conv.lastMessage.sender) !== user?.id);
+        return isUnread ? acc + 1 : acc;
+    }, 0);
 
     // Bật/Tắt Dropdown
     const toggleDropdown = (name) => {
@@ -161,6 +172,22 @@ const TopHeaderNav = () => {
     // Mở khung chat khi click vào cuộc hội thoại
     const handleSelectConversation = (conv) => {
         setActiveDropdown(null);
+        if (!conv) return;
+        
+        // Đánh dấu đã đọc trong state để chuyển chữ nhạt hơn và gỡ chấm xanh ngay lập tức
+        const convId = conv.id || conv._id;
+        setConversations(prev => prev.map(c => {
+            if ((c.id || c._id) === convId) {
+                return {
+                    ...c,
+                    unreadCount: 0,
+                    isUnread: false,
+                    lastMessage: c.lastMessage ? { ...c.lastMessage, isRead: true } : c.lastMessage
+                };
+            }
+            return c;
+        }));
+
         window.dispatchEvent(new CustomEvent("open-chat-conversation", { detail: conv }));
     };
 
@@ -179,13 +206,27 @@ const TopHeaderNav = () => {
             }
         }
 
-        // Điều hướng
+        // Điều hướng trực tiếp đến trang chi tiết
         if (notif.type === "friend_request") {
             navigate("/friends");
-        } else if (notif.type === "friend_accepted" && notif.fromUser?.id) {
-            navigate(`/profile/${notif.fromUser.id}`);
+        } else if (notif.type === "friend_accepted") {
+            if (notif.fromUser?.id) {
+                navigate(`/profile/${notif.fromUser.id}`);
+            } else {
+                navigate("/friends");
+            }
+        } else if (["post_liked", "post_commented", "post_shared"].includes(notif.type) || notif.referenceType === "post") {
+            if (notif.referenceId) {
+                navigate(`/post/${notif.referenceId}`);
+            } else {
+                navigate("/");
+            }
+        } else if (notif.type === "new_message") {
+            navigate("/messages");
         } else if (notif.referenceId) {
             navigate(`/post/${notif.referenceId}`);
+        } else if (notif.fromUser?.id) {
+            navigate(`/profile/${notif.fromUser.id}`);
         } else {
             navigate("/");
         }
@@ -207,11 +248,7 @@ const TopHeaderNav = () => {
     // Helper format thời gian tương đối
     const formatTimeAgo = (dateString) => {
         if (!dateString) return "";
-        try {
-            return formatDistanceToNowStrict(new Date(dateString), { addSuffix: true, locale: vi });
-        } catch {
-            return "";
-        }
+        return formatRelativeTime(dateString);
     };
 
     // Helper icon theo loại thông báo
@@ -258,7 +295,7 @@ const TopHeaderNav = () => {
 
                 {/* Dropdown Lời Mời Kết Bạn */}
                 {activeDropdown === "friends" && (
-                    <div className="absolute right-0 sm:right-auto sm:left-0 mt-3 w-80 sm:w-96 bg-white border border-slate-100 rounded-2xl shadow-2xl shadow-slate-300/50 z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
+                    <div className="absolute right-0 mt-3 w-80 sm:w-96 max-w-[calc(100vw-2rem)] bg-white border border-slate-100 rounded-2xl shadow-2xl shadow-slate-300/50 z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
                         <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
                             <div className="flex items-center space-x-2">
                                 <Users className="w-4 h-4 text-blue-600" />
@@ -363,11 +400,16 @@ const TopHeaderNav = () => {
                     title="Tin nhắn"
                 >
                     <MessageSquare className="w-5 h-5" />
+                    {unreadMessagesCount > 0 && (
+                        <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold w-4 h-4 rounded-full flex items-center justify-center animate-pulse shadow-md ring-2 ring-white">
+                            {unreadMessagesCount > 9 ? "9+" : unreadMessagesCount}
+                        </span>
+                    )}
                 </button>
 
                 {/* Dropdown Hộp Thư Tin Nhắn */}
                 {activeDropdown === "messages" && (
-                    <div className="absolute right-0 sm:right-auto sm:-left-20 mt-3 w-80 sm:w-96 bg-white border border-slate-100 rounded-2xl shadow-2xl shadow-slate-300/50 z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
+                    <div className="absolute right-0 mt-3 w-80 sm:w-96 max-w-[calc(100vw-2rem)] bg-white border border-slate-100 rounded-2xl shadow-2xl shadow-slate-300/50 z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
                         <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
                             <div className="flex items-center space-x-2">
                                 <MessageSquare className="w-4 h-4 text-blue-600" />
@@ -378,7 +420,7 @@ const TopHeaderNav = () => {
                                 onClick={() => setActiveDropdown(null)} 
                                 className="text-xs text-blue-600 hover:underline font-medium flex items-center"
                             >
-                                Tất cả cuộc gọi <ChevronRight className="w-3.5 h-3.5 ml-0.5" />
+                                Xem tất cả tin nhắn <ChevronRight className="w-3.5 h-3.5 ml-0.5" />
                             </Link>
                         </div>
 
@@ -415,13 +457,17 @@ const TopHeaderNav = () => {
                                         }
                                     }
 
-                                    const isOnline = partnerId && onlineUsers.includes(partnerId);
+                                    const isOnline = partnerId && (Array.isArray(onlineUsers) ? onlineUsers.includes(partnerId) : Boolean(onlineUsers?.[partnerId]));
+                                    const isUnread = conv.unreadCount > 0 || conv.isUnread || 
+                                        (conv.lastMessage && !conv.lastMessage.isRead && (conv.lastMessage.senderId || conv.lastMessage.sender) !== user?.id);
 
                                     return (
                                         <div
                                             key={conv.id || conv._id}
                                             onClick={() => handleSelectConversation(conv)}
-                                            className="p-3 hover:bg-slate-50 transition cursor-pointer flex items-center space-x-3 group"
+                                            className={`p-3.5 hover:bg-slate-50 transition cursor-pointer flex items-center space-x-3 group relative ${
+                                                isUnread ? "bg-blue-50/40" : ""
+                                            }`}
                                         >
                                             <div className="relative shrink-0">
                                                 <img 
@@ -436,17 +482,22 @@ const TopHeaderNav = () => {
 
                                             <div className="flex-1 min-w-0">
                                                 <div className="flex items-center justify-between">
-                                                    <p className="font-semibold text-sm text-slate-800 group-hover:text-blue-600 truncate">
+                                                    <p className={`text-sm truncate ${isUnread ? "font-bold text-slate-900" : "font-semibold text-slate-800 group-hover:text-blue-600"}`}>
                                                         {name}
                                                     </p>
-                                                    <span className="text-[10px] text-slate-400 shrink-0 ml-2">
+                                                    <span className={`text-[10px] shrink-0 ml-2 ${isUnread ? "font-bold text-blue-600" : "text-slate-400"}`}>
                                                         {formatTimeAgo(conv.updatedAt || conv.lastMessageAt)}
                                                     </span>
                                                 </div>
-                                                <p className="text-xs text-slate-500 truncate mt-0.5">
+                                                <p className={`text-xs truncate mt-0.5 ${isUnread ? "font-bold text-slate-900" : "text-slate-500"}`}>
                                                     {conv.lastMessage?.content || "Nhấn để bắt đầu trò chuyện"}
                                                 </p>
                                             </div>
+
+                                            {/* Dấu chấm xanh ở cuối phân biệt tin nhắn chưa đọc */}
+                                            {isUnread && (
+                                                <span className="w-2.5 h-2.5 bg-blue-600 rounded-full shrink-0 ml-1 shadow-sm shadow-blue-500/50"></span>
+                                            )}
                                         </div>
                                     );
                                 })
@@ -479,7 +530,7 @@ const TopHeaderNav = () => {
 
                 {/* Dropdown Danh Sách Thông Báo */}
                 {activeDropdown === "notifications" && (
-                    <div className="absolute right-0 mt-3 w-80 sm:w-96 bg-white border border-slate-100 rounded-2xl shadow-2xl shadow-slate-300/50 z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
+                    <div className="absolute right-0 mt-3 w-80 sm:w-96 max-w-[calc(100vw-2rem)] bg-white border border-slate-100 rounded-2xl shadow-2xl shadow-slate-300/50 z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
                         <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
                             <div className="flex items-center space-x-2">
                                 <Bell className="w-4 h-4 text-blue-600" />
@@ -537,7 +588,7 @@ const TopHeaderNav = () => {
                                             </div>
 
                                             <div className="flex-1 min-w-0">
-                                                <p className={`text-xs text-slate-800 line-clamp-2 ${!notif.isRead ? "font-semibold" : "font-normal"}`}>
+                                                <p className={`text-xs line-clamp-2 ${!notif.isRead ? "font-bold text-slate-900" : "font-normal text-slate-600"}`}>
                                                     {notif.message}
                                                 </p>
                                                 <span className="text-[10px] text-blue-600 font-medium mt-1 inline-block">

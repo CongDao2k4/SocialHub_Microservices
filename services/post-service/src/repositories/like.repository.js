@@ -31,5 +31,13 @@ export const likeRepository = {
       DELETE FROM likes WHERE post_id = ${postId}::uuid AND user_id = ${userId}::uuid RETURNING id
     `;
     return result[0];
+  },
+
+  findByPostId: async (postId, limit = 20) => {
+    return await prisma.like.findMany({
+      where: { post_id: postId },
+      take: limit,
+      orderBy: { created_at: 'desc' }
+    });
   }
 };
