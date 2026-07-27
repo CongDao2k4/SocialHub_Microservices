@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { Mic, MicOff, Video, VideoOff, PhoneOff, Maximize2, Minimize2, Users } from "lucide-react";
+import { Mic, MicOff, Video, VideoOff, PhoneOff, Maximize2, Minimize2, Users, SwitchCamera } from "lucide-react";
 import api from "../services/api";
 
 const ICE_SERVERS = {
@@ -74,6 +74,10 @@ const CallWindow = ({ activeCall, chatSocket, currentUserId, onClose }) => {
     const [isVideoOff, setIsVideoOff] = useState(callType === 'audio');
     const [duration, setDuration] = useState(0);
     const [isMinimized, setIsMinimized] = useState(false);
+    const [facingMode, setFacingMode] = useState("user");
+    const [hasMultipleCameras, setHasMultipleCameras] = useState(
+        new URLSearchParams(window.location.search).get("testcam") === "true"
+    );
 
     // Dành cho Cuộc gọi nhóm: Danh sách các thành viên đang tham gia cuộc gọi
     const [groupParticipants, setGroupParticipants] = useState([]);
@@ -228,8 +232,8 @@ const CallWindow = ({ activeCall, chatSocket, currentUserId, onClose }) => {
                     audio: true,
                     video: callType === "video" 
                         ? (isGroup 
-                            ? { width: { ideal: 640 }, height: { ideal: 480 }, frameRate: { ideal: 24 } }
-                            : { width: { ideal: 1280 }, height: { ideal: 720 } })
+                            ? { facingMode: "user", width: { ideal: 640 }, height: { ideal: 480 }, frameRate: { ideal: 24 } }
+                            : { facingMode: "user", width: { ideal: 1280 }, height: { ideal: 720 } })
                         : false
                 };
 
@@ -240,6 +244,18 @@ const CallWindow = ({ activeCall, chatSocket, currentUserId, onClose }) => {
                 }
 
                 localStreamRef.current = stream;
+
+                // Tự động kiểm tra xem thiết bị có nhiều camera hay không (chẳng hạn như camera trước & sau trên điện thoại)
+                try {
+                    const devices = await navigator.mediaDevices.enumerateDevices();
+                    const videoDevices = devices.filter(d => d.kind === "videoinput");
+                    const urlParams = new URLSearchParams(window.location.search);
+                    if (videoDevices.length > 1 || urlParams.get("testcam") === "true") {
+                        setHasMultipleCameras(true);
+                    }
+                } catch (err) {
+                    console.warn("⚠️ Không thể kiểm tra danh sách thiết bị camera:", err);
+                }
                 if (localVideoRef.current) {
                     localVideoRef.current.srcObject = stream;
                 }
@@ -604,6 +620,71 @@ const CallWindow = ({ activeCall, chatSocket, currentUserId, onClose }) => {
         }
     };
 
+    const toggleCamera = async () => {
+        if (!localStreamRef.current || callType !== 'video') return;
+
+        try {
+            const newFacingMode = facingMode === "user" ? "environment" : "user";
+            
+            // 1. Dừng track video hiện tại
+            const oldVideoTrack = localStreamRef.current.getVideoTracks()[0];
+            if (oldVideoTrack) {
+                oldVideoTrack.stop();
+            }
+
+            // 2. Định nghĩa các ràng buộc (constraints) camera mới
+            const newConstraints = {
+                audio: false, // Giữ nguyên micro hiện tại, tránh xin lại quyền gây đứt tiếng
+                video: isGroup 
+                    ? { facingMode: newFacingMode, width: { ideal: 640 }, height: { ideal: 480 }, frameRate: { ideal: 24 } }
+                    : { facingMode: newFacingMode, width: { ideal: 1280 }, height: { ideal: 720 } }
+            };
+
+            // 3. Xin cấp stream video từ camera mới
+            const newStream = await navigator.mediaDevices.getUserMedia(newConstraints);
+            const newVideoTrack = newStream.getVideoTracks()[0];
+
+            if (!newVideoTrack) {
+                throw new Error("Không tìm thấy luồng dữ liệu của camera mới");
+            }
+
+            // 4. Thay thế track video cũ bằng track video mới trong localStreamRef
+            localStreamRef.current.removeTrack(oldVideoTrack);
+            localStreamRef.current.addTrack(newVideoTrack);
+
+            // 5. Cập nhật thẻ video cục bộ hiển thị camera mới
+            if (localVideoRef.current) {
+                localVideoRef.current.srcObject = localStreamRef.current;
+            }
+
+            // 6. Cập nhật track mới lên luồng WebRTC truyền đi (1-1 Call)
+            if (peerConnectionRef.current) {
+                const senders = peerConnectionRef.current.getSenders();
+                const videoSender = senders.find(s => s.track && s.track.kind === 'video');
+                if (videoSender) {
+                    await videoSender.replaceTrack(newVideoTrack);
+                }
+            }
+
+            // 7. Cập nhật track mới lên tất cả các luồng WebRTC truyền đi (Group Call)
+            Object.values(groupPeersRef.current).forEach(peerObj => {
+                if (peerObj && peerObj.pc) {
+                    const videoSender = peerObj.pc.getSenders().find(s => s.track && s.track.kind === 'video');
+                    if (videoSender) {
+                        videoSender.replaceTrack(newVideoTrack).catch(err => {
+                            console.error("❌ Lỗi thay thế video track cho group peer:", err);
+                        });
+                    }
+                }
+            });
+
+            setFacingMode(newFacingMode);
+        } catch (err) {
+            console.error("❌ Lỗi chuyển đổi camera trước/sau:", err.message);
+            alert("Không thể chuyển đổi camera: " + err.message);
+        }
+    };
+
     return (
         <div
             className={`fixed z-50 transition-all duration-300 ${isMinimized
@@ -658,7 +739,7 @@ const CallWindow = ({ activeCall, chatSocket, currentUserId, onClose }) => {
                                     autoPlay
                                     playsInline
                                     muted
-                                    className="w-full h-full object-cover mirror"
+                                    className={`w-full h-full object-cover ${facingMode === 'user' ? 'mirror' : ''}`}
                                 />
                                 {(isVideoOff || callType === 'audio') && (
                                     <div className="absolute inset-0 bg-slate-900 flex flex-col items-center justify-center space-y-2">
@@ -717,7 +798,7 @@ const CallWindow = ({ activeCall, chatSocket, currentUserId, onClose }) => {
                                         autoPlay
                                         playsInline
                                         muted
-                                        className="w-full h-full object-cover mirror"
+                                        className={`w-full h-full object-cover ${facingMode === 'user' ? 'mirror' : ''}`}
                                     />
                                     {isVideoOff && (
                                         <div className="absolute inset-0 bg-slate-900 flex items-center justify-center text-slate-500 text-xs">
@@ -751,14 +832,26 @@ const CallWindow = ({ activeCall, chatSocket, currentUserId, onClose }) => {
                         </button>
 
                         {callType === "video" && (
-                            <button
-                                onClick={toggleVideo}
-                                className={`p-3.5 sm:p-4 rounded-full border transition cursor-pointer active:scale-95 ${isVideoOff ? "bg-rose-600 border-rose-500 text-white" : "bg-slate-800 hover:bg-slate-700 border-slate-600 text-white"
-                                    }`}
-                                title={isVideoOff ? "Bật Camera" : "Tắt Camera"}
-                            >
-                                {isVideoOff ? <VideoOff className="w-5 h-5 sm:w-6 sm:h-6" /> : <Video className="w-5 h-5 sm:w-6 sm:h-6" />}
-                            </button>
+                            <>
+                                <button
+                                    onClick={toggleVideo}
+                                    className={`p-3.5 sm:p-4 rounded-full border transition cursor-pointer active:scale-95 ${isVideoOff ? "bg-rose-600 border-rose-500 text-white" : "bg-slate-800 hover:bg-slate-700 border-slate-600 text-white"
+                                        }`}
+                                    title={isVideoOff ? "Bật Camera" : "Tắt Camera"}
+                                >
+                                    {isVideoOff ? <VideoOff className="w-5 h-5 sm:w-6 sm:h-6" /> : <Video className="w-5 h-5 sm:w-6 sm:h-6" />}
+                                </button>
+
+                                {hasMultipleCameras && !isVideoOff && (
+                                    <button
+                                        onClick={toggleCamera}
+                                        className="p-3.5 sm:p-4 rounded-full bg-slate-800 hover:bg-slate-700 border border-slate-600 text-white transition cursor-pointer active:scale-95 hover:scale-105"
+                                        title="Chuyển đổi camera trước/sau"
+                                    >
+                                        <SwitchCamera className="w-5 h-5 sm:w-6 sm:h-6" />
+                                    </button>
+                                )}
+                            </>
                         )}
                     </div>
                 )}
