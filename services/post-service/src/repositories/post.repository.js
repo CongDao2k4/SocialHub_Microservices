@@ -31,17 +31,33 @@ export const postRepository = {
     await prisma.post.delete({ where: { id } });
   },
 
-  findByAuthorId: async (authorId, limit, offset) => {
+  findByAuthorId: async (authorId, limit, offset, allowedVisibilities = ['public', 'friends']) => {
     return await prisma.post.findMany({
-      where: { author_id: authorId },
+      where: { 
+        author_id: authorId,
+        group_id: null,
+        OR: [
+          { visibility: { in: allowedVisibilities } },
+          { visibility: null }
+        ]
+      },
       orderBy: { created_at: 'desc' },
       take: limit,
       skip: offset
     });
   },
 
-  countByAuthorId: async (authorId) => {
-    return await prisma.post.count({ where: { author_id: authorId } });
+  countByAuthorId: async (authorId, allowedVisibilities = ['public', 'friends']) => {
+    return await prisma.post.count({ 
+      where: { 
+        author_id: authorId,
+        group_id: null,
+        OR: [
+          { visibility: { in: allowedVisibilities } },
+          { visibility: null }
+        ]
+      } 
+    });
   },
 
   incrementCommentCount: async (id) => {
@@ -150,11 +166,12 @@ export const postRepository = {
     });
   },
 
-  findGroupPosts: async (groupId, status, limit, offset) => {
+  findGroupPosts: async (groupId, status, limit, offset, authorId) => {
     return await prisma.post.findMany({
       where: {
         group_id: groupId,
-        status: status || 'approved'
+        status: status || 'approved',
+        ...(authorId ? { author_id: authorId } : {})
       },
       include: {
         group: true
@@ -165,11 +182,12 @@ export const postRepository = {
     });
   },
 
-  countGroupPosts: async (groupId, status) => {
+  countGroupPosts: async (groupId, status, authorId) => {
     return await prisma.post.count({
       where: {
         group_id: groupId,
-        status: status || 'approved'
+        status: status || 'approved',
+        ...(authorId ? { author_id: authorId } : {})
       }
     });
   },

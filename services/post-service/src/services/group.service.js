@@ -225,7 +225,7 @@ export const groupService = {
     return newPost;
   },
 
-  getGroupPosts: async (groupId, status, limit, offset, requestingUserId, token) => {
+  getGroupPosts: async (groupId, status, limit, offset, requestingUserId, token, authorId) => {
     const group = await groupRepository.findById(groupId);
     if (!group) {
       throw new NotFoundError('Group not found');
@@ -244,8 +244,8 @@ export const groupService = {
       }
     }
 
-    const posts = await postRepository.findGroupPosts(groupId, status, limit, offset);
-    const count = await postRepository.countGroupPosts(groupId, status);
+    const posts = await postRepository.findGroupPosts(groupId, status, limit, offset, authorId);
+    const count = await postRepository.countGroupPosts(groupId, status, authorId);
 
     // Enrich posts with author profile and check like status
     const enrichedPosts = await Promise.all(

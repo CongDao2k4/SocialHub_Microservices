@@ -1,3 +1,4 @@
+import axios from 'axios';
 import { postRepository } from '../repositories/post.repository.js';
 import { likeRepository } from '../repositories/like.repository.js';
 import { validateMediaIds, getUserProfile } from '../utils/api.js';
@@ -79,8 +80,25 @@ export const postService = {
   getUserPosts: async ({ userId, currentUserId, page, limit, token }) => {
     const offset = (page - 1) * limit;
     
-    const total = await postRepository.countByAuthorId(userId);
-    const posts = await postRepository.findByAuthorId(userId, limit, offset);
+    let allowedVisibilities = ['public'];
+    if (currentUserId === userId) {
+      allowedVisibilities = ['public', 'friends'];
+    } else {
+      try {
+        const friendServiceUrl = process.env.FRIEND_SERVICE_URL || 'http://friend-service:5000';
+        const friendRes = await axios.get(`${friendServiceUrl}/api/friends/internal/${currentUserId}`);
+        if (friendRes.data && friendRes.data.success && Array.isArray(friendRes.data.friendIds)) {
+          if (friendRes.data.friendIds.includes(userId)) {
+            allowedVisibilities = ['public', 'friends'];
+          }
+        }
+      } catch (err) {
+        console.error('❌ Error checking friendship for user posts:', err.message);
+      }
+    }
+
+    const total = await postRepository.countByAuthorId(userId, allowedVisibilities);
+    const posts = await postRepository.findByAuthorId(userId, limit, offset, allowedVisibilities);
     const author = await getUserProfile(userId, token);
 
     const postsWithDetails = await Promise.all(posts.map(async (post) => {

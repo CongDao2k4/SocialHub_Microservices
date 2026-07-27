@@ -469,19 +469,19 @@ const GroupDetail = () => {
                                 <div className="divide-y divide-slate-100">
                                     {members.map((m) => (
                                         <div key={m.id} className="flex items-center justify-between py-3.5 first:pt-0 last:pb-0">
-                                            <div className="flex items-center space-x-3">
+                                            <Link to={`/groups/${id}/user/${m.user_id}`} className="flex items-center space-x-3 cursor-pointer group">
                                                 <img
                                                     src={m.avatarUrl || `https://api.dicebear.com/7.x/initials/svg?seed=${m.displayName}`}
                                                     alt={m.displayName}
-                                                    className="w-10 h-10 rounded-full object-cover border border-slate-200"
+                                                    className="w-10 h-10 rounded-full object-cover border border-slate-200 group-hover:opacity-80 transition"
                                                 />
                                                 <div>
-                                                    <h5 className="font-semibold text-slate-800 text-sm">{m.displayName}</h5>
+                                                    <h5 className="font-semibold text-slate-800 text-sm group-hover:text-blue-600 transition">{m.displayName}</h5>
                                                     <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${m.role === 'admin' ? 'bg-red-50 text-red-600 border border-red-100' : m.role === 'moderator' ? 'bg-blue-50 text-blue-600 border border-blue-100' : 'bg-slate-100 text-slate-500'}`}>
                                                         {m.role === 'admin' ? 'Admin' : m.role === 'moderator' ? 'Moderator' : 'Thành viên'}
                                                     </span>
                                                 </div>
-                                            </div>
+                                            </Link>
 
                                             {/* Action buttons (only for admin) */}
                                             {group.currentUserRole === "admin" && m.user_id !== group.created_by && (
@@ -585,17 +585,17 @@ const GroupDetail = () => {
                                         <div className="divide-y divide-slate-100">
                                             {pendingMembers.map((m) => (
                                                 <div key={m.id} className="flex items-center justify-between py-3">
-                                                    <div className="flex items-center space-x-3">
+                                                    <Link to={`/groups/${id}/user/${m.user_id}`} className="flex items-center space-x-3 group">
                                                         <img
                                                             src={m.avatarUrl || `https://api.dicebear.com/7.x/initials/svg?seed=${m.displayName}`}
                                                             alt={m.displayName}
-                                                            className="w-10 h-10 rounded-full object-cover border border-slate-200"
+                                                            className="w-10 h-10 rounded-full object-cover border border-slate-200 group-hover:opacity-80 transition"
                                                         />
                                                         <div>
-                                                            <h5 className="font-semibold text-slate-800 text-sm">{m.displayName}</h5>
+                                                            <h5 className="font-semibold text-slate-800 text-sm group-hover:text-blue-600 transition">{m.displayName}</h5>
                                                             <span className="text-[10px] text-slate-400">Yêu cầu tham gia {new Date(m.joined_at).toLocaleDateString()}</span>
                                                         </div>
-                                                    </div>
+                                                    </Link>
 
                                                     <div className="flex items-center space-x-2">
                                                         <button
