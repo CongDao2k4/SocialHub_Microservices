@@ -23,6 +23,8 @@ model Post {
   view_count       Int?      @default(0)
   created_at       DateTime  @default(now()) @db.Timestamptz(6)
   updated_at       DateTime  @default(now()) @db.Timestamptz(6)
+  group_id         String?   @db.Uuid
+  status           String?   @default("approved") @db.VarChar(20)
 
   // Relations
   original_post    Post?     @relation("SharedPosts", fields: [original_post_id], references: [id])
@@ -30,6 +32,7 @@ model Post {
   original_reel    Reel?     @relation("SharedReels", fields: [original_reel_id], references: [id], onDelete: SetNull)
   likes            Like[]
   comments         Comment[]
+  group            Group?    @relation(fields: [group_id], references: [id], onDelete: Cascade)
 
   @@index([author_id], map: "idx_posts_author_id")
   @@index([created_at(sort: Desc)], map: "idx_posts_created_at")
@@ -110,4 +113,39 @@ model ReelComment {
   @@index([reel_id], map: "idx_reelcomments_reel_id")
   @@map("reels_comments")
 }
+
+model Group {
+  id                     String        @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  name                   String        @db.VarChar(100)
+  description            String?       @db.Text
+  avatar_url             String?       @db.VarChar(255)
+  cover_url              String?       @db.VarChar(255)
+  privacy                String        @default("public") @db.VarChar(20)
+  post_approval_required Boolean       @default(true)
+  created_by             String        @db.Uuid
+  created_at             DateTime      @default(now()) @db.Timestamptz(6)
+  updated_at             DateTime      @default(now()) @db.Timestamptz(6)
+
+  // Relations
+  members                GroupMember[]
+  posts                  Post[]
+
+  @@map("groups")
+}
+
+model GroupMember {
+  id         String   @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  group_id   String   @db.Uuid
+  user_id    String   @db.Uuid
+  role       String   @default("member") @db.VarChar(20)
+  status     String   @default("pending") @db.VarChar(20)
+  joined_at  DateTime @default(now()) @db.Timestamptz(6)
+
+  // Relations
+  group      Group    @relation(fields: [group_id], references: [id], onDelete: Cascade)
+
+  @@unique([group_id, user_id])
+  @@map("group_members")
+}
+
 

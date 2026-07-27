@@ -181,8 +181,24 @@ const Notifications = () => {
                                 
                                 <div className="flex-1 min-w-0">
                                     <p className="text-xs sm:text-sm font-medium leading-snug break-words">
-                                        <strong className="font-bold text-slate-900">{notif.fromUser?.displayName || "Một người dùng"}</strong>{" "}
-                                        {notif.message}
+                                        {(() => {
+                                            const displayName = notif.fromUser?.displayName;
+                                            const msg = notif.message || "";
+                                            if (displayName && msg.startsWith(displayName)) {
+                                                return (
+                                                    <>
+                                                        <strong className="font-bold text-slate-900">{displayName}</strong>
+                                                        {msg.slice(displayName.length)}
+                                                    </>
+                                                );
+                                            }
+                                            return (
+                                                <>
+                                                    <strong className="font-bold text-slate-900">{displayName || "Một người dùng"}</strong>{" "}
+                                                    {msg}
+                                                </>
+                                            );
+                                        })()}
                                     </p>
                                     <p className="text-[10px] sm:text-xs text-slate-400 mt-1">{new Date(notif.createdAt).toLocaleString()}</p>
                                 </div>
