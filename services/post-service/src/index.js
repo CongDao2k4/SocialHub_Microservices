@@ -10,6 +10,7 @@ import cors from 'cors';
 import { initDatabase } from './config/db.js';
 import postRoutes from './routes/post.routes.js';
 import reelRoutes from './routes/reel.routes.js';
+import groupRoutes from './routes/group.routes.js';
 
 const app = express();
 
@@ -39,6 +40,7 @@ app.use((req, res, next) => {
 
 app.use('/', postRoutes);
 app.use('/', reelRoutes);
+app.use('/', groupRoutes);
 
 // Global Error Handler
 app.use((err, req, res, next) => {

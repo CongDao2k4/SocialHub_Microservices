@@ -135,5 +135,49 @@ export const postRepository = {
       where: { id },
       data: { view_count: { increment: 1 } }
     });
+  },
+
+  createGroupPost: async ({ authorId, content, mediaIds, groupId, status }) => {
+    return await prisma.post.create({
+      data: {
+        author_id: authorId,
+        content: content || '',
+        media_ids: mediaIds || [],
+        visibility: 'public',
+        group_id: groupId,
+        status: status || 'pending'
+      }
+    });
+  },
+
+  findGroupPosts: async (groupId, status, limit, offset) => {
+    return await prisma.post.findMany({
+      where: {
+        group_id: groupId,
+        status: status || 'approved'
+      },
+      include: {
+        group: true
+      },
+      orderBy: { created_at: 'desc' },
+      take: limit,
+      skip: offset
+    });
+  },
+
+  countGroupPosts: async (groupId, status) => {
+    return await prisma.post.count({
+      where: {
+        group_id: groupId,
+        status: status || 'approved'
+      }
+    });
+  },
+
+  updatePostStatus: async (postId, status) => {
+    return await prisma.post.update({
+      where: { id: postId },
+      data: { status }
+    });
   }
 };

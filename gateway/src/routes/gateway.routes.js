@@ -36,10 +36,18 @@ const mapToPostService = (req, res) => {
   return httpClientService.forwardToPostService(req, res, targetPath);
 };
 
+const mapSocialGroupToPostService = (req, res) => {
+  const targetPath = (req.baseUrl + req.path)
+    .replace(/^\/api\/social-groups/, '/groups')
+    .replace(/^\/social-groups/, '/groups');
+  return httpClientService.forwardToPostService(req, res, targetPath);
+};
+
 // Map all under /posts and /feed to post-service
 router.use('/posts', protectRoute, mapToPostService);
 router.use('/feed', protectRoute, mapToPostService);
 router.use('/reels', protectRoute, mapToPostService);
+router.use('/social-groups', protectRoute, mapSocialGroupToPostService);
 
 // --- friend-service routes ---
 const mapToFriendService = (req, res) => {

@@ -393,9 +393,19 @@ const PostCard = ({post, currentUserId, onPostShared, onPostDeleted, onPostUpdat
                         />
                     </Link>
                     <div>
-                        <Link to={`/profile/${post.author_id}`} className="font-semibold text-slate-800 text-sm hover:text-blue-600 transition">
-                            {post.author?.displayName || "Người dùng SocialHub"}
-                        </Link>
+                        <div className="flex items-center flex-wrap gap-1">
+                            <Link to={`/profile/${post.author_id}`} className="font-semibold text-slate-800 text-sm hover:text-blue-600 transition">
+                                {post.author?.displayName || "Người dùng SocialHub"}
+                            </Link>
+                            {post.group && (
+                                <>
+                                    <span className="text-xs text-slate-450 font-bold mx-0.5">➔</span>
+                                    <Link to={`/groups/${post.group.id}`} className="font-semibold text-slate-650 hover:text-blue-600 transition">
+                                        {post.group.name}
+                                    </Link>
+                                </>
+                            )}
+                        </div>
                         <p className="text-xs text-slate-500 mt-0.5">{formatRelativeTime(post.created_at || post.createdAt)}</p>
                     </div>
                 </div>
