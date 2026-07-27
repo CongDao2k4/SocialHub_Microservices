@@ -70,9 +70,6 @@ const CreateReelModal = ({ onClose, onUploadSuccess }) => {
       formData.append("file", videoFile);
 
       const uploadRes = await api.post("/media/upload", formData, {
-        headers: {
-          "Content-Type": "multipart/form-data",
-        },
         // Lắng nghe tiến trình upload realtime
         onUploadProgress: (progressEvent) => {
           if (progressEvent.total) {

@@ -30,6 +30,7 @@ router.get('/feed', FeedController.getFeed);
 // Likes
 router.post('/posts/:id/like', LikeController.likePost);
 router.delete('/posts/:id/like', LikeController.unlikePost);
+router.get('/posts/:id/likes', LikeController.getPostLikes);
 
 // Comments
 router.get('/posts/:id/comments', CommentController.getPostComments);

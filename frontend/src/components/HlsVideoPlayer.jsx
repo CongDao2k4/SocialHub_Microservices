@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import Hls from "hls.js";
 import { Loader, Play, Pause, Volume2, VolumeX, Maximize, Minimize } from "lucide-react";
 import { getMediaFileUrl, getHlsUrl } from "../services/mediaUrl";
+import api from "../services/api";
 
 const PLAYLIST_RETRY_DELAY_MS = 2500;
 const MAX_PLAYLIST_RETRIES = 12;
@@ -57,7 +58,7 @@ const HlsVideoPlayer = ({
   const [fallbackBlobUrl, setFallbackBlobUrl] = useState(null);
   const [isLandscape, setIsLandscape] = useState(false);
 
-  const effectivePoster = poster || (mediaId ? getMediaFileUrl(mediaId, "medium") : undefined);
+  const effectivePoster = poster || undefined;
 
   useEffect(() => {
     if (!mediaId) return;
@@ -432,6 +433,10 @@ const HlsVideoPlayer = ({
             if (videoRef.current.videoWidth && videoRef.current.videoHeight) {
               setIsLandscape(videoRef.current.videoWidth > videoRef.current.videoHeight);
             }
+            // Tự động seek nhẹ về 0.001s để trình duyệt render ngay lập tức khung hình đầu tiên của video (First Frame Thumbnail)
+            if (!autoPlay && videoRef.current.currentTime === 0) {
+              videoRef.current.currentTime = 0.001;
+            }
             setIsLoading(false);
           }
           if (parentOnLoadedMetadata) parentOnLoadedMetadata(e);
@@ -474,7 +479,7 @@ const HlsVideoPlayer = ({
       {!isPlaying && !isLoading && (
         <div
           onClick={handleTogglePlay}
-          className="absolute inset-0 flex items-center justify-center z-10 cursor-pointer bg-black/10 group-hover:bg-black/20 transition"
+          className="absolute inset-0 flex items-center justify-center z-20 cursor-pointer bg-black/10 group-hover:bg-black/20 transition"
         >
           <div className="w-14 h-14 md:w-16 md:h-16 rounded-full bg-black/60 backdrop-blur-md flex items-center justify-center text-white border border-white/20 shadow-2xl scale-95 group-hover:scale-100 transition duration-200">
             <Play className="w-7 h-7 fill-white ml-1" />

@@ -98,7 +98,14 @@ api.interceptors.request.use(
         config.headers["ngrok-skip-browser-warning"] = "any-value";
 
         if (config.data instanceof FormData || (config.url && config.url.includes("/media/upload"))) {
-            delete config.headers["Content-Type"];
+            if (config.headers) {
+                delete config.headers["Content-Type"];
+                delete config.headers["content-type"];
+                if (typeof config.headers.delete === "function") {
+                    config.headers.delete("Content-Type");
+                    config.headers.delete("content-type");
+                }
+            }
             config.timeout = 0; // Disable timeout for uploads and video processing
         }
         return config;
@@ -121,7 +128,7 @@ const resolveUrls = (obj) => {
             const val = obj[key];
             if (typeof val === "string") {
                 const lowerKey = key.toLowerCase();
-                if ((lowerKey === "avatarurl" || lowerKey === "avatar_url") && val) {
+                if ((lowerKey === "avatarurl" || lowerKey === "avatar_url" || lowerKey === "coverurl" || lowerKey === "cover_url") && val) {
                     if (val.startsWith("blob:")) continue;
 
                     const getMediaBase = () => {
@@ -140,10 +147,10 @@ const resolveUrls = (obj) => {
                     } else {
                         try {
                             const mediaBase = getMediaBase();
-                            const urlObj = new URL(val);
                             if (val.includes("/media/file/")) {
-                                const mediaId = val.split("/media/file/").pop().split("?")[0];
-                                resolvedUrl = `${mediaBase}/media/file/${mediaId}`;
+                                const parts = val.split("/media/file/");
+                                const pathAndQuery = parts.pop();
+                                resolvedUrl = `${mediaBase}/media/file/${pathAndQuery}`;
                             }
                         } catch (e) {}
                     }

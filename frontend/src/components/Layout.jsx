@@ -2,10 +2,11 @@ import {Outlet, Link, useNavigate, useLocation} from "react-router-dom";
 import {useAuth} from "../context/AuthContext";
 import {useSocket} from "../context/SocketContext";
 import ChatWidget from "./ChatWidget"; // <-- Import thêm ChatWidget
-import {Home, Users, User, LogOut, Bell, MessageSquare, Film, Layers} from "lucide-react";
+import TopHeaderNav from "./TopHeaderNav";
+import {Home, Users, LogOut, Bell, MessageSquare, Film, Layers} from "lucide-react";
 const Layout = () => {
-    const { user, logout } = useAuth();
-    const { unreadCount, toast, setToast } = useSocket();
+    const {user, logout} = useAuth();
+    const {unreadCount, toast, setToast} = useSocket();
     const navigate = useNavigate();
     const location = useLocation();
 
@@ -110,19 +111,11 @@ const Layout = () => {
                         </span>
                     </Link>
 
-                    {/* Navigation Links */}
-                    <nav className="space-y-1">
+                    {/* Navigation Links - Chỉ giữ các mục không có ở Top Header Nav */}
+                    <nav className="space-y-1.5">
                         <Link to="/" className={navLinkClass("/")}>
                             <Home className={navIconClass("/")} />
                             <span>Bảng tin</span>
-                        </Link>
-                        <Link to="/friends" className={navLinkClass("/friends")}>
-                            <Users className={navIconClass("/friends")} />
-                            <span>Bạn bè</span>
-                        </Link>
-                        <Link to="/messages" className={navLinkClass("/messages")}>
-                            <MessageSquare className={navIconClass("/messages")} />
-                            <span>Tin nhắn</span>
                         </Link>
                         <Link to="/reels" className={navLinkClass("/reels")}>
                             <Film className={navIconClass("/reels")} />
@@ -173,6 +166,12 @@ const Layout = () => {
                 </div>
             </aside>
 
+            {/* Top Navbar Header Cố Định (Desktop >= 768px) */}
+            <header className="hidden md:flex fixed top-0 right-0 left-64 h-14 bg-white/95 backdrop-blur-md border-b border-slate-200/80 px-6 items-center justify-end z-30 shadow-sm">
+                {/* Nhóm Icon Hành Động: Bạn bè -> Tin nhắn -> Thông báo */}
+                <TopHeaderNav />
+            </header>
+
             {/* Bottom Navigation Bar Mobile (Chỉ hiện trên di động < 768px) */}
             <nav className="md:hidden fixed bottom-0 inset-x-0 h-16 bg-white/95 backdrop-blur-md border-t border-slate-200/80 z-40 flex items-center justify-around px-2 shadow-lg active:touch-none select-none">
                 <Link to="/" className={`flex flex-col items-center justify-center w-14 h-12 rounded-xl transition active:scale-95 ${location.pathname === "/" ? "text-blue-600 font-bold" : "text-slate-500 hover:text-slate-800"}`}>
@@ -205,11 +204,10 @@ const Layout = () => {
             </nav>
 
             {/* Nội dung chính bên phải */}
-            <main className={`flex-1 ml-0 md:ml-64 lg:mr-64 ${
-                isMessagesPage ? "pt-14 pb-16 md:pt-8 md:pb-8 p-2 md:p-4 min-h-screen" : 
-                isReelsPage ? "fixed inset-0 top-14 bottom-16 md:static md:min-h-screen md:pt-8 md:pb-8 p-0 md:p-8" : 
-                "pt-16 pb-20 md:pt-8 md:pb-8 p-3 sm:p-6 md:p-8 min-h-screen"
-            }`}>
+            <main className={`flex-1 ml-0 md:ml-64 lg:mr-64 ${isMessagesPage ? "pt-14 pb-16 md:pt-14 md:pb-8 p-2 md:p-4 min-h-screen" :
+                    isReelsPage ? "fixed inset-0 top-14 bottom-16 md:static md:min-h-screen md:pt-14 md:pb-8 p-0 md:p-8" :
+                        "pt-16 pb-20 md:pt-16 md:pb-8 p-3 sm:p-6 md:p-8 min-h-screen"
+                }`}>
                 <div className={isMessagesPage ? "w-full h-full" : isReelsPage ? "w-full h-full flex justify-center items-center" : "max-w-4xl mx-auto"}>
                     <Outlet /> {/* Nơi các trang con hiển thị */}
                 </div>

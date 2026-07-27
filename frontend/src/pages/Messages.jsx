@@ -318,9 +318,7 @@ const Messages = () => {
             const formData = new FormData();
             formData.append("file", file);
 
-            const res = await api.post("/media/upload", formData, {
-                headers: { "Content-Type": "multipart/form-data" }
-            });
+            const res = await api.post("/media/upload", formData);
 
             const mId = res.data?.id;
             if (mId) {
@@ -365,9 +363,7 @@ const Messages = () => {
 
                     const formData = new FormData();
                     formData.append("file", fileToUpload);
-                    const res = await api.post("/media/upload", formData, {
-                        headers: {"Content-Type": "multipart/form-data"}
-                    });
+                    const res = await api.post("/media/upload", formData);
                     return res.data?.id;
                 });
                 const resIds = await Promise.all(uploadPromises);

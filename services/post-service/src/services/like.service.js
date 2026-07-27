@@ -45,5 +45,24 @@ export const likeService = {
     }
 
     return currentLikeCount;
+  },
+
+  getPostLikes: async ({ postId, token }) => {
+    const likes = await likeRepository.findByPostId(postId, 20);
+    const likesWithUser = await Promise.all(likes.map(async (like) => {
+      try {
+        const user = await getUserProfile(like.user_id, token);
+        return {
+          ...like,
+          user
+        };
+      } catch (err) {
+        return {
+          ...like,
+          user: { id: like.user_id, displayName: 'Người dùng' }
+        };
+      }
+    }));
+    return likesWithUser;
   }
 };

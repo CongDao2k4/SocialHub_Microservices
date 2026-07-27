@@ -156,19 +156,27 @@ const ChatBox = ({ conversation, onClose, currentUserId }) => {
     const [isRecording, setIsRecording] = useState(false);
     const fileInputRef = useRef(null);
 
+    // Guard: conversation không hợp lệ thì không render
+    if (!conversation || (!conversation._id && !conversation.id)) {
+        return null;
+    }
+
     const conversationId = conversation._id || conversation.id;
     
     // Tìm người trò chuyện đối phương
-    const otherParticipant = conversation.participants?.find(p => p.userId !== currentUserId) || {
+    const otherParticipant = conversation.participants?.find(p => {
+        const pId = p.userId || p.id || p._id;
+        return pId && pId !== currentUserId;
+    }) || conversation.participants?.[0] || {
         displayName: "Người dùng",
         avatarUrl: null,
         userId: ""
     };
 
-    const isGroup = conversation.type === "group";
+    const isGroup = conversation.type === "group" || conversation.isGroup;
     const chatTitle = isGroup
-        ? conversation.groupRef?.name || "Cuộc trò chuyện nhóm"
-        : otherParticipant.displayName;
+        ? conversation.groupRef?.name || conversation.name || "Cuộc trò chuyện nhóm"
+        : otherParticipant.displayName || otherParticipant.name || "Người dùng";
     
     const chatAvatar = isGroup
         ? conversation.groupRef?.avatarUrl || `https://api.dicebear.com/7.x/identicon/svg?seed=${conversationId}`
@@ -318,9 +326,7 @@ const ChatBox = ({ conversation, onClose, currentUserId }) => {
             formData.append("file", file);
 
             // Upload audio lên media-service
-            const res = await api.post("/media/upload", formData, {
-                headers: { "Content-Type": "multipart/form-data" }
-            });
+            const res = await api.post("/media/upload", formData);
 
             const mId = res.data?.id;
             if (mId) {

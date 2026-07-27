@@ -1,5 +1,5 @@
-import { useState, useEffect } from "react";
-import { Link } from "react-router-dom"; // <-- Import thêm Link
+import { useState, useEffect, Component } from "react";
+import { Link } from "react-router-dom";
 import api from "../services/api";
 import { useSocket } from "../context/SocketContext";
 import { useAuth } from "../context/AuthContext";
@@ -7,6 +7,31 @@ import ChatBox from "./ChatBox";
 import IncomingCallModal from "./IncomingCallModal";
 import CallWindow from "./CallWindow";
 import { Users, Loader, MessageSquarePlus, X, UserPlus, Sparkles } from "lucide-react";
+
+// ErrorBoundary: ngăn tòan bộ trang bị trắng khi ChatBox gặp lỗi bất ngờ
+class ChatBoxErrorBoundary extends Component {
+    constructor(props) {
+        super(props);
+        this.state = { hasError: false };
+    }
+    static getDerivedStateFromError() {
+        return { hasError: true };
+    }
+    componentDidCatch(error, info) {
+        console.error("ChatBox Error:", error, info);
+    }
+    render() {
+        if (this.state.hasError) {
+            return (
+                <div className="w-full sm:w-80 bg-white border border-red-200 rounded-t-2xl shadow-xl flex items-center justify-between p-3">
+                    <p className="text-xs text-red-500">Không thể mở cuộc trò chuyện</p>
+                    <button onClick={this.props.onClose} className="text-slate-400 hover:text-slate-600 cursor-pointer"><X className="w-4 h-4" /></button>
+                </div>
+            );
+        }
+        return this.props.children;
+    }
+}
 
 const ChatWidget = () => {
     const { user: currentUser } = useAuth();
@@ -87,15 +112,55 @@ const ChatWidget = () => {
         setOpenChats(prev => prev.filter(c => (c._id !== conversationId && c.id !== conversationId)));
     };
 
-    // 4. Lắng nghe sự kiện "open-chat" từ các trang khác (như Trang cá nhân)
+    // 4. Lắng nghe sự kiện "open-chat" và "open-chat-conversation" từ các trang khác
     useEffect(() => {
         const handleOpenChatEvent = (e) => {
             const friend = e.detail;
             handleOpenChat(friend);
         };
+
+        const handleOpenConversationEvent = async (e) => {
+            const conversation = e.detail;
+            if (!conversation) return;
+            
+            const convId = conversation._id || conversation.id;
+            if (!convId) {
+                console.error("❌ open-chat-conversation: conversation thiếu ID", conversation);
+                return;
+            }
+
+            // Nếu conversation thiếu participants (dữ liệu partial từ list API), fetch full từ API
+            const hasValidParticipants = Array.isArray(conversation.participants) && conversation.participants.length > 0;
+            let fullConversation = conversation;
+            if (!hasValidParticipants) {
+                try {
+                    const res = await api.get(`/conversations/${convId}`);
+                    if (res.data?.success) {
+                        fullConversation = res.data.data;
+                    }
+                } catch (err) {
+                    console.error("❌ Lỗi fetch cuộc hội thoại khi mở chat:", err);
+                    return;
+                }
+            }
+
+            setOpenChats(prev => {
+                const id = fullConversation._id || fullConversation.id;
+                if (prev.some(c => (c._id || c.id) === id)) return prev;
+                const newChats = [...prev, fullConversation];
+                if (newChats.length > 3) newChats.shift();
+                return newChats;
+            });
+        };
+
         window.addEventListener("open-chat", handleOpenChatEvent);
-        return () => window.removeEventListener("open-chat", handleOpenChatEvent);
+        window.addEventListener("open-chat-conversation", handleOpenConversationEvent);
+        return () => {
+            window.removeEventListener("open-chat", handleOpenChatEvent);
+            window.removeEventListener("open-chat-conversation", handleOpenConversationEvent);
+        };
     }, [openChats]);
+
 
     // 5. Lắng nghe tin nhắn mới từ chatSocket để tự động bật popup ChatBox
     useEffect(() => {
@@ -283,19 +348,29 @@ const ChatWidget = () => {
 
             {/* Container chứa các ô chat nổi ở góc dưới bên phải màn hình */}
             <div className="fixed bottom-16 sm:bottom-0 right-0 sm:right-6 lg:right-72 inset-x-0 sm:inset-x-auto z-40 flex items-end justify-end space-x-4 pointer-events-none px-2 sm:px-0">
-                {openChats.map(conv => (
-                    <div key={conv._id || conv.id} className="pointer-events-auto w-full sm:w-auto">
-                        {/* Map trạng thái online vào cuộc trò chuyện */}
-                        <ChatBox
-                            conversation={{
-                                ...conv,
-                                isOnline: conv.participants?.some(p => p.userId !== currentUser.id && onlineUsers[p.userId] === true)
-                            }}
-                            onClose={() => handleCloseChat(conv._id || conv.id)}
-                            currentUserId={currentUser.id}
-                        />
-                    </div>
-                ))}
+                {openChats.map(conv => {
+                    const convKey = conv._id || conv.id;
+                    if (!convKey) return null; // bỏ qua conversation không có ID
+                    return (
+                        <div key={convKey} className="pointer-events-auto w-full sm:w-auto">
+                            <ChatBoxErrorBoundary onClose={() => handleCloseChat(convKey)}>
+                                <ChatBox
+                                    conversation={{
+                                        ...conv,
+                                        isOnline: Array.isArray(conv.participants)
+                                            ? conv.participants.some(p => {
+                                                const pId = p.userId || p.id || p._id;
+                                                return pId && pId !== currentUser.id && onlineUsers[pId] === true;
+                                              })
+                                            : false
+                                    }}
+                                    onClose={() => handleCloseChat(convKey)}
+                                    currentUserId={currentUser.id}
+                                />
+                            </ChatBoxErrorBoundary>
+                        </div>
+                    );
+                })}
             </div>
 
             {/* Modal Tạo Nhóm Chat */}
