@@ -128,7 +128,9 @@ Neu dung Docker Compose cho ca backend, xem them trong `docker-compose.yml`.
 
 - `POST /api/posts`
 - `GET /api/posts/:postId`
+- `PUT /api/posts/:postId`
 - `DELETE /api/posts/:postId`
+- `GET /api/posts/user/:userId`
 - `GET /api/feed`
 - `POST /api/posts/:postId/like`
 - `DELETE /api/posts/:postId/like`
@@ -136,7 +138,17 @@ Neu dung Docker Compose cho ca backend, xem them trong `docker-compose.yml`.
 - `POST /api/posts/:postId/comments`
 - `DELETE /api/posts/:postId/comments/:commentId`
 - `POST /api/posts/:postId/share`
-- `GET /api/reels`
+- `POST /api/reels` (Tạo Reel mới)
+- `GET /api/reels` (Bảng tin Reels)
+- `GET /api/reels/user/:userId` (Reels của người dùng)
+- `GET /api/reels/:id` (Chi tiết Reel)
+- `POST /api/reels/:id/view` (Tăng lượt xem Reel)
+- `PUT /api/reels/:id` (Chỉnh sửa Reel - Chỉ tác giả)
+- `DELETE /api/reels/:id` (Xóa Reel - Chỉ tác giả)
+- `POST /api/reels/:id/like` (Thích Reel)
+- `DELETE /api/reels/:id/like` (Bỏ thích Reel)
+- `GET /api/reels/:id/comments` (Bình luận Reel)
+- `POST /api/reels/:id/comments` (Tạo bình luận Reel)
 
 ### Media
 
@@ -200,11 +212,14 @@ Trong `.env` hien co:
 ## Tai lieu theo service
 
 - [gateway/readme.md](./gateway/readme.md)
-- [services/media-service/readme.md](./services/media-service/readme.md)
+- [services/user-service/readme.md](./services/user-service/readme.md)
+- [services/friend-service/readme.md](./services/friend-service/readme.md)
+- [services/post-service/readme.md](./services/post-service/readme.md)
 - [services/chat-service/readme.md](./services/chat-service/readme.md)
+- [services/media-service/readme.md](./services/media-service/readme.md)
+- [services/notification-service/readme.md](./services/notification-service/readme.md)
 - [frontend/readme.md](./frontend/readme.md)
 
 ## Luu y hien tai
 
-- upload video se cham hon upload anh vi phai cho HLS xong moi tra ve
-- build frontend hien dang co mot loi ton tai rieng voi `browser-image-compression` trong `Profile.jsx`, khong nam trong phan tai lieu nay
+- Quá trình upload video được xử lý bất đồng bộ (asynchronous HLS transcoding) giúp API trả về mã `201 Created` ngay lập tức để không gây tắc nghẽn luồng request.

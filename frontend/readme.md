@@ -77,6 +77,8 @@ frontend/
 │   │   ├── PostCard.jsx        # Card hiển thị 1 bài viết (Like, Comment, Share, Edit, Delete)
 │   │   ├── ShareModal.jsx      # Modal chia sẻ bài viết
 │   │   ├── EditPostModal.jsx   # Modal chỉnh sửa bài viết
+│   │   ├── CreateReelModal.jsx # Modal tải lên thước phim Reel mới
+│   │   ├── HlsVideoPlayer.jsx  # Đầu phát HLS Streaming & MP4 fallback
 │   │   ├── ChatWidget.jsx      # Sidebar chat bên phải + quản lý các ô chat nổi
 │   │   └── ChatBox.jsx         # Ô chat nổi nhỏ ở góc dưới phải màn hình
 │   │
@@ -84,6 +86,7 @@ frontend/
 │       ├── Login.jsx           # Trang đăng nhập
 │       ├── Register.jsx        # Trang đăng ký
 │       ├── Feed.jsx            # Trang bảng tin (Newsfeed)
+│       ├── Reels.jsx           # Trang thước phim ngắn Reels (vuốt xem video, like, comment, share, xóa)
 │       ├── PostDetail.jsx      # Trang chi tiết 1 bài viết
 │       ├── Friends.jsx         # Trang quản lý bạn bè
 │       ├── Notifications.jsx   # Trang danh sách thông báo
@@ -1147,10 +1150,25 @@ ChatImage({ mediaId })
 | `PUT` | `/api/posts/{id}` | Cập nhật bài viết | EditPostModal |
 | `DELETE` | `/api/posts/{id}` | Xóa bài viết | PostCard |
 | `POST` | `/api/posts/{id}/like` | Thích/bỏ thích | PostCard |
-| `GET` | `/api/posts/{id}/comments` | Lấy bình luận | PostCard |
 | `POST` | `/api/posts/{id}/comments` | Thêm bình luận | PostCard |
 | `DELETE` | `/api/posts/{id}/comments/{commentId}` | Xóa bình luận | PostCard |
 | `POST` | `/api/posts/{id}/share` | Chia sẻ bài viết | ShareModal |
+
+### 🎬 Reels API
+
+| Method | Endpoint | Mô tả | Nơi gọi |
+|---|---|---|---|
+| `GET` | `/api/reels` | Lấy danh sách Reels | Reels |
+| `GET` | `/api/reels/user/{userId}` | Lấy Reels theo user | Profile |
+| `GET` | `/api/reels/{id}` | Chi tiết 1 Reel | Reels, PostDetail, PostCard (nhúng) |
+| `POST` | `/api/reels` | Đăng Reel mới | CreateReelModal |
+| `PUT` | `/api/reels/{id}` | Cập nhật Reel (Chỉ chủ sở hữu) | Reels |
+| `DELETE` | `/api/reels/{id}` | Xóa Reel (Chỉ chủ sở hữu) | Reels, Profile |
+| `POST` | `/api/reels/{id}/view` | Tăng lượt xem Reel | Reels |
+| `POST` | `/api/reels/{id}/like` | Thích Reel | Reels |
+| `DELETE` | `/api/reels/{id}/like` | Bỏ thích Reel | Reels |
+| `GET` | `/api/reels/{id}/comments` | Lấy danh sách bình luận Reel | Reels |
+| `POST` | `/api/reels/{id}/comments` | Đăng bình luận cho Reel | Reels |
 
 ### 🖼️ Media Service
 

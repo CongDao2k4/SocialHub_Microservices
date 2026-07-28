@@ -1,21 +1,22 @@
-# Post Service — Content Management
+# Post Service — Content & Reels Management
 
-> Bounded Context: Post & Feed Management
-> Dịch vụ quản lý nội dung bài viết, bảng tin (newsfeed), tương tác lượt thích (like), bình luận (comment) và chia sẻ (share).
+> Bounded Context: Post, Feed & Reels Management
+> Dịch vụ quản lý nội dung bài viết, bảng tin (newsfeed), thước phim ngắn (reels), tương tác lượt thích (like), bình luận (comment) và chia sẻ (share).
 
 ## Overview
 
-- **Business Domain**: Quản lý bài viết (Posts), Newsfeed, Lượt thích (Likes), Bình luận (Comments) và Chia sẻ bài viết (Shares).
-- **Data Owned**: Nội dung bài viết, cài đặt quyền riêng tư (visibility), đếm tương tác (like_count, comment_count, share_count), danh sách likes và bình luận.
+- **Business Domain**: Quản lý bài viết (Posts), Newsfeed, Thước phim ngắn (Reels), Lượt thích (Likes), Bình luận (Comments) và Chia sẻ (Shares).
+- **Data Owned**: Nội dung bài viết, cài đặt quyền riêng tư (visibility), thước phim Reels, đếm tương tác (`like_count`, `comment_count`, `share_count`, `view_count`), danh sách likes và bình luận.
 - **Operations Exposed**: 
   - Tạo, đọc, cập nhật, xóa bài viết.
-  - Thích (Like) và Bỏ thích (Unlike) bài viết.
-  - Lấy danh sách bình luận, tạo bình luận mới và xóa bình luận.
-  - Chia sẻ bài viết (Share post).
+  - Tạo, đọc, cập nhật, xóa Reels (chỉ chủ sở hữu được phép xóa/sửa).
+  - Thích (Like) và Bỏ thích (Unlike) bài viết/Reels.
+  - Lấy danh sách bình luận, tạo bình luận mới và xóa bình luận cho bài viết/Reels.
+  - Chia sẻ bài viết & Reels (Share post/reel).
   - Tạo bảng tin cá nhân/toàn cục (Newsfeed) với hỗ trợ phân trang Cursor-based & Offset-based.
 - **Inter-service Communication & Caching**:
-  - Tích hợp với `user-service` để truy vấn thông tin tác giả bài viết, tự động cache profile người dùng vào Redis (`user:{userId}`) với thời gian sống (TTL) 30 phút.
-  - Tích hợp với `media-service` để xác thực danh sách `mediaIds` đính kèm bài viết.
+  - Tích hợp với `user-service` để truy vấn thông tin tác giả bài viết/Reels, tự động cache profile người dùng vào Redis (`user:{userId}`) với thời gian sống (TTL) 30 phút.
+  - Tích hợp với `media-service` để xác thực danh sách `mediaIds` đính kèm bài viết và video Reels.
   - Phát hành các sự kiện Redis Pub/Sub (`post.liked`, `post.commented`, `post.shared`) để `notification-service` xử lý gửi thông báo.
 
 ---
@@ -36,15 +37,18 @@
 
 Dịch vụ sử dụng PostgreSQL thông qua Prisma ORM ([`prisma/schema.prisma`](prisma/schema.prisma)):
 
-* **`Post`**: Bài viết (gồm tác giả `author_id`, `content`, mảng `media_ids`, `visibility`, flags bài chia sẻ `is_shared`, `original_post_id`, cùng các bộ đếm `like_count`, `comment_count`, `share_count`).
-* **`Like`**: Lưu trữ tương tác thích bài viết (Ràng buộc duy nhất Unique `[post_id, user_id]`).
-* **`Comment`**: Bình luận bài viết (`post_id`, `author_id`, `content`).
+* **`Post`**: Bài viết (gồm tác giả `author_id`, `content`, mảng `media_ids`, `visibility`, flags bài chia sẻ `is_shared`, `original_post_id`, `original_reel_id`, cùng các bộ đếm `like_count`, `comment_count`, `share_count`).
+* **`Reel`**: Thước phim ngắn dạng dọc (`author_id`, `content`, `media_ids`, `view_count`, `like_count`, `comment_count`, `share_count`).
+* **`Like` / `ReelLike`**: Lưu trữ tương tác thích bài viết / Reel (Ràng buộc duy nhất Unique `[post_id, user_id]` / `[reel_id, user_id]`).
+* **`Comment` / `ReelComment`**: Bình luận bài viết / Reel (`post_id`/`reel_id`, `author_id`, `content`).
 
 ---
 
 ## API Endpoints (REST API)
 
 Tất cả các endpoint ngoại trừ `/health` đều yêu cầu xác thực JWT. Gateway sẽ chuyển tiếp Header `Authorization: Bearer <JWT_TOKEN>` hoặc `x-user-id`.
+
+### Posts & Feed API
 
 | Method | Endpoint (qua Gateway `/api`)           | Direct Endpoint (port `5000`)           | Description                                                        |
 |--------|----------------------------------------|----------------------------------------|--------------------------------------------------------------------|
@@ -61,6 +65,22 @@ Tất cả các endpoint ngoại trừ `/health` đều yêu cầu xác thực J
 | POST   | `/posts/:id/comments`                  | `/posts/:id/comments`                  | Tạo bình luận mới trên bài viết (`content`)                        |
 | DELETE | `/posts/:postId/comments/:commentId`   | `/posts/:postId/comments/:commentId`   | Xóa bình luận (Tác giả bình luận hoặc tác giả bài viết)           |
 | POST   | `/posts/:id/share`                     | `/posts/:id/share`                     | Chia sẻ lại một bài viết (`content`)                               |
+
+### Reels API
+
+| Method | Endpoint (qua Gateway `/api`)           | Direct Endpoint (port `5000`)           | Description                                                        |
+|--------|----------------------------------------|----------------------------------------|--------------------------------------------------------------------|
+| POST   | `/reels`                               | `/reels`                               | Tạo thước phim Reel mới (`caption`, `mediaId`)                     |
+| GET    | `/reels`                               | `/reels`                               | Lấy danh sách Reels feed (Phân trang `page`, `limit`)              |
+| GET    | `/reels/user/:userId`                  | `/reels/user/:userId`                  | Lấy danh sách Reels của một người dùng                             |
+| GET    | `/reels/:id`                           | `/reels/:id`                           | Lấy chi tiết 1 Reel theo ID                                        |
+| POST   | `/reels/:id/view`                      | `/reels/:id/view`                      | Tăng lượt xem Reel                                                 |
+| PUT    | `/reels/:id`                           | `/reels/:id`                           | Cập nhật thông tin Reel (Chỉ tác giả / 403 Forbidden)              |
+| DELETE | `/reels/:id`                           | `/reels/:id`                           | Xóa Reel (Chỉ tác giả / 403 Forbidden)                             |
+| POST   | `/reels/:id/like`                      | `/reels/:id/like`                      | Thích Reel                                                         |
+| DELETE | `/reels/:id/like`                      | `/reels/:id/like`                      | Bỏ thích Reel                                                      |
+| GET    | `/reels/:id/comments`                  | `/reels/:id/comments`                  | Lấy danh sách bình luận của Reel                                   |
+| POST   | `/reels/:id/comments`                  | `/reels/:id/comments`                  | Tạo bình luận cho Reel (`content`)                                 |
 
 > Tham khảo chi tiết tài liệu OpenAPI: [`docs/api-specs/post-service.yaml`](../../docs/api-specs/post-service.yaml)
 
@@ -151,7 +171,7 @@ post-service/
 ├── package.json
 ├── readme.md
 ├── prisma/
-│   └── schema.prisma         # Prisma Schema định nghĩa Post, Like, Comment
+│   └── schema.prisma         # Prisma Schema định nghĩa Post, Reel, Like, Comment
 └── src/
     ├── index.js              # Khởi tạo Express Server và kết nối Database
     ├── config/
@@ -159,6 +179,7 @@ post-service/
     │   └── redis.js          # Khởi tạo Redis Client & Publisher
     ├── controllers/
     │   ├── post.controller.js   # API Controller cho bài viết
+    │   ├── reel.controller.js   # API Controller cho Reels (CRUD, view, like, comment)
     │   ├── feed.controller.js   # API Controller cho bảng tin newsfeed
     │   ├── like.controller.js   # API Controller cho lượt thích
     │   ├── comment.controller.js# API Controller cho bình luận
@@ -171,9 +192,11 @@ post-service/
     │   ├── like.repository.js
     │   └── comment.repository.js
     ├── routes/
-    │   └── post.routes.js    # Khai báo các tuyến đường REST API
+    │   ├── post.routes.js    # Khai báo các tuyến đường REST API bài viết
+    │   └── reel.routes.js    # Khai báo các tuyến đường REST API Reels
     ├── services/             # Logic nghiệp vụ chính & phát hành sự kiện Redis
     │   ├── post.service.js
+    │   ├── reel.service.js
     │   ├── feed.service.js
     │   ├── like.service.js
     │   ├── comment.service.js
@@ -183,3 +206,4 @@ post-service/
         ├── error.js          # Các lớp xử lý lỗi tùy chỉnh
         └── response.js       # Format dữ liệu trả về HTTP response
 ```
+
