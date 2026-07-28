@@ -3,7 +3,7 @@ import {useParams, useNavigate} from "react-router-dom";
 import api from "../services/api";
 import PostCard from "../components/PostCard";
 import {useAuth} from "../context/AuthContext";
-import {Loader, Calendar, Mail, FileText, UserPlus, UserCheck, UserMinus, MessageSquare, Edit3, Camera, Save, X, Film, Clock} from "lucide-react";
+import {Loader, Calendar, Mail, FileText, UserPlus, UserCheck, UserMinus, MessageSquare, Edit3, Camera, Save, X, Film, Clock, Trash2} from "lucide-react";
 import imageCompression from "browser-image-compression";
 import {formatRelativeTime} from "../utils/dateUtils";
 
@@ -188,7 +188,7 @@ const EditProfileModal = ({profileUser, onClose, onProfileUpdated}) => {
     );
 };
 
-const ReelThumbnail = ({reel, onClick}) => {
+const ReelThumbnail = ({reel, onClick, isOwnProfile, onDelete}) => {
     const [videoSrc, setVideoSrc] = useState("");
     const [isLoading, setIsLoading] = useState(false);
 
@@ -241,6 +241,21 @@ const ReelThumbnail = ({reel, onClick}) => {
                     Lỗi tải video
                 </div>
             )}
+
+            {/* Nút xóa Reel dành cho chủ sở hữu */}
+            {isOwnProfile && onDelete && (
+                <button
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        onDelete(reel.id);
+                    }}
+                    title="Xóa thước phim này"
+                    className="absolute top-2 right-2 p-1.5 rounded-full bg-black/40 hover:bg-black/60 hover:text-red-400 text-white border border-white/10 backdrop-blur-sm z-10 transition duration-150 active:scale-95 shadow-md"
+                >
+                    <Trash2 className="w-3.5 h-3.5" />
+                </button>
+            )}
+
             {/* Overlay số lượt xem */}
             <div className="absolute bottom-2.5 left-2.5 flex items-center space-x-1 bg-black/40 backdrop-blur-sm px-2 py-0.5 rounded-full text-white text-[10px] font-bold select-none">
                 <span>▶</span>
@@ -379,6 +394,20 @@ const Profile = () => {
                 avatarUrl: profileUser.avatarUrl
             }
         }));
+    };
+
+    // F. Xóa Reel của chính mình
+    const handleDeleteReel = async (reelId) => {
+        if (!window.confirm("Bạn có chắc chắn muốn xóa thước phim này? Thao tác này không thể hoàn tác.")) return;
+        try {
+            const res = await api.delete(`/reels/${reelId}`);
+            if (res.data && res.data.success) {
+                setUserReels(prev => prev.filter(r => r.id !== reelId));
+            }
+        } catch (err) {
+            console.error("❌ Lỗi xóa Reel:", err);
+            alert(err.response?.data?.message || "Không thể xóa thước phim này!");
+        }
     };
 
     useEffect(() => {
@@ -592,8 +621,8 @@ const Profile = () => {
                 <button
                     onClick={() => setActiveTab("posts")}
                     className={`flex items-center space-x-2 px-6 py-3 font-semibold text-xs uppercase tracking-wider transition border-b-2 cursor-pointer ${activeTab === "posts"
-                            ? "border-blue-600 text-blue-600 animate-fadeIn"
-                            : "border-transparent text-slate-500 hover:text-slate-800"
+                        ? "border-blue-600 text-blue-600 animate-fadeIn"
+                        : "border-transparent text-slate-500 hover:text-slate-800"
                         }`}
                 >
                     <FileText className="w-4 h-4" />
@@ -602,8 +631,8 @@ const Profile = () => {
                 <button
                     onClick={() => setActiveTab("reels")}
                     className={`flex items-center space-x-2 px-6 py-3 font-semibold text-xs uppercase tracking-wider transition border-b-2 cursor-pointer ${activeTab === "reels"
-                            ? "border-blue-600 text-blue-600 animate-fadeIn"
-                            : "border-transparent text-slate-500 hover:text-slate-800"
+                        ? "border-blue-600 text-blue-600 animate-fadeIn"
+                        : "border-transparent text-slate-500 hover:text-slate-800"
                         }`}
                 >
                     <Film className="w-4 h-4" />
@@ -653,7 +682,9 @@ const Profile = () => {
                             <ReelThumbnail
                                 key={reel.id}
                                 reel={reel}
-                                onClick={() => navigate("/reels")}
+                                isOwnProfile={isOwnProfile}
+                                onDelete={handleDeleteReel}
+                                onClick={() => navigate(`/reels?id=${reel.id}`)}
                             />
                         ))
                     ) : (

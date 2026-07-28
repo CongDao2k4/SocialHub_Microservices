@@ -336,3 +336,58 @@ export const getReelById = async (req, res) => {
   }
 };
 
+// 10. Cập nhật thông tin Reel (Chỉ chủ sở hữu)
+export const updateReel = async (req, res) => {
+  try {
+    const id = req.params.id;
+    const {caption, content} = req.body;
+    const userId = req.user.id;
+    const updatedContent = caption !== undefined ? caption : content;
+
+    const reel = await prisma.reel.findUnique({where: {id}});
+    if (!reel) {
+      return errorResponse(res, 404, 'Reel not found');
+    }
+
+    if (reel.author_id !== userId) {
+      return errorResponse(res, 403, 'Chỉ chủ sở hữu mới có quyền chỉnh sửa Reels này');
+    }
+
+    const updatedReel = await prisma.reel.update({
+      where: {id},
+      data: {
+        content: updatedContent !== undefined ? updatedContent : reel.content,
+        updated_at: new Date()
+      }
+    });
+
+    return successResponse(res, 200, updatedReel);
+  } catch (error) {
+    return handleError(res, error, 'Update Reel Error');
+  }
+};
+
+// 11. Xóa Reel (Chỉ chủ sở hữu)
+export const deleteReel = async (req, res) => {
+  try {
+    const id = req.params.id;
+    const userId = req.user.id;
+
+    const reel = await prisma.reel.findUnique({where: {id}});
+    if (!reel) {
+      return errorResponse(res, 404, 'Reel not found');
+    }
+
+    if (reel.author_id !== userId) {
+      return errorResponse(res, 403, 'Chỉ chủ sở hữu mới có quyền xóa Reels này');
+    }
+
+    await prisma.reel.delete({where: {id}});
+
+    return successResponse(res, 200, {message: 'Đã xóa Reels thành công'});
+  } catch (error) {
+    return handleError(res, error, 'Delete Reel Error');
+  }
+};
+
+

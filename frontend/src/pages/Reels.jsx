@@ -16,7 +16,8 @@ import {
   Pause,
   ChevronDown,
   Film,
-  MessageSquareCode
+  MessageSquareCode,
+  Trash2
 } from "lucide-react";
 import CreateReelModal from "../components/CreateReelModal";
 import ShareModal from "../components/ShareModal";
@@ -30,12 +31,13 @@ const formatTime = (seconds) => {
 };
 
 // Component con hiển thị từng Video Reel đơn lẻ
-const ReelItem = ({reel, isActive, isMuted, toggleMute, onLikeToggle, onOpenComments, onShare}) => {
+const ReelItem = ({reel, isActive, isMuted, toggleMute, onLikeToggle, onOpenComments, onShare, onDelete, currentUserId}) => {
   const videoRef = useRef(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [showHeartAnimation, setShowHeartAnimation] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
+  const isOwner = currentUserId && (reel.author_id === currentUserId || reel.author?.id === currentUserId);
 
   // Click vào video để Play/Pause thủ công
   const handleVideoClick = () => {
@@ -193,6 +195,17 @@ const ReelItem = ({reel, isActive, isMuted, toggleMute, onLikeToggle, onOpenComm
           </button>
           <span className="text-[10px] font-bold text-white drop-shadow-md">{shareCount}</span>
         </div>
+
+        {/* Nút Xóa Reel (Chỉ dành cho chủ sở hữu) */}
+        {isOwner && (
+          <button
+            onClick={() => onDelete(reel.id)}
+            title="Xóa thước phim này"
+            className="p-3 rounded-full bg-black/40 backdrop-blur-md border border-white/10 hover:bg-black/60 hover:text-red-400 text-white transition duration-300 cursor-pointer shadow-lg active:scale-90"
+          >
+            <Trash2 className="w-5 h-5" />
+          </button>
+        )}
       </div>
 
       {/* Thanh Scrubber / Tua video chuẩn Facebook Reels ở đáy */}
@@ -224,6 +237,7 @@ const ReelItem = ({reel, isActive, isMuted, toggleMute, onLikeToggle, onOpenComm
 
 // Component chính trang Reels
 const Reels = () => {
+  const { user } = useAuth();
   const [searchParams] = useSearchParams();
   const targetReelId = searchParams.get("id");
 
@@ -439,6 +453,25 @@ const Reels = () => {
     setShowShareModal(true);
   };
 
+  // Xóa Reel dành cho chủ sở hữu
+  const handleDeleteReel = async (reelId) => {
+    if (!window.confirm("Bạn có chắc chắn muốn xóa thước phim này? Thao tác này không thể hoàn tác.")) return;
+
+    try {
+      const res = await api.delete(`/reels/${reelId}`);
+      if (res.data && res.data.success) {
+        setReels(prev => prev.filter(r => r.id !== reelId));
+        if (selectedCommentReel?.id === reelId) {
+          setCommentDrawerOpen(false);
+          setSelectedCommentReel(null);
+        }
+      }
+    } catch (err) {
+      console.error("❌ Lỗi xóa Reel:", err.message);
+      alert(err.response?.data?.message || "Không thể xóa thước phim này!");
+    }
+  };
+
   return (
     <div className="w-full h-full flex flex-col items-center justify-center relative select-none py-2 md:py-0">
 
@@ -488,6 +521,8 @@ const Reels = () => {
                       onLikeToggle={handleLikeToggle}
                       onOpenComments={handleOpenComments}
                       onShare={handleShareClick}
+                      onDelete={handleDeleteReel}
+                      currentUserId={user?.id}
                     />
                   ) : (
                     <div className="w-full h-full bg-slate-950 flex flex-col items-center justify-center text-slate-600 space-y-2">
