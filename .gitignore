@@ -118,3 +118,7 @@ k8s/turnserver.conf
 
 cloudfare/
 key_oracle/
+
+.env*
+.env2
+.env3

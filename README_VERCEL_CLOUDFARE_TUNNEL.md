@@ -156,7 +156,7 @@ Sau khi đã có đường hầm tunnel (ở Cách A hoặc Cách B):
 3. Thêm 2 biến môi trường mới:
    - **Biến 1 (API Gateway)**:
      - **Key**: `VITE_API_URL`
-     - **Value**: `https://api-local.yourdomain.com/api` (hoặc URL TryCloudflare)
+     - **Value**: `https://api-local.yourdomain.com/` (hoặc URL TryCloudflare)
    - **Biến 2 (Media Service Direct Bypass - Giúp Vercel xem Reels không bị nghẽn Gateway)**:
      - **Key**: `VITE_MEDIA_URL`
      - **Value**: `https://media-local.yourdomain.com` (hoặc URL TryCloudflare trỏ tới port 5005)
