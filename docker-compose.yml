@@ -30,6 +30,7 @@ services:
     build: ./gateway
     ports:
       - "${GATEWAY_PORT:-8080}:8000"
+    restart: unless-stopped
     deploy:
       resources:
         limits:
@@ -58,6 +59,7 @@ services:
     build: ./services/user-service
     ports:
       - "${USER_SERVICE_PORT:-5001}:5000"
+    restart: unless-stopped
     deploy:
       resources:
         limits:
@@ -88,6 +90,7 @@ services:
     build: ./services/friend-service
     ports:
       - "${FRIEND_SERVICE_PORT:-5002}:5000"
+    restart: unless-stopped
     deploy:
       resources:
         limits:
@@ -118,6 +121,7 @@ services:
     build: ./services/post-service
     ports:
       - "${POST_SERVICE_PORT:-5003}:5000"
+    restart: unless-stopped
     deploy:
       resources:
         limits:
@@ -148,6 +152,7 @@ services:
     build: ./services/chat-service
     ports:
       - "${CHAT_SERVICE_PORT:-5004}:5000"
+    restart: unless-stopped
     deploy:
       resources:
         limits:
@@ -178,6 +183,7 @@ services:
     build: ./services/media-service
     ports:
       - "${MEDIA_SERVICE_PORT:-5005}:5000"
+    restart: unless-stopped
     deploy:
       resources:
         limits:
@@ -208,6 +214,7 @@ services:
     build: ./services/notification-service
     ports:
       - "${NOTIFICATION_SERVICE_PORT:-5006}:5000"
+    restart: unless-stopped
     deploy:
       resources:
         limits:
@@ -238,6 +245,7 @@ services:
     command: postgres -c shared_buffers=128MB -c max_connections=50
     ports:
       - "${PG_HOST_PORT:-5432}:5432"
+    restart: unless-stopped
     environment:
       POSTGRES_DB: ${PG_DATABASE:-socialhub}
       POSTGRES_USER: ${PG_USER:-socialhub}
@@ -248,7 +256,7 @@ services:
           cpus: '0.5'
           memory: 256M
     volumes:
-      - pg-data:/var/lib/postgresql/data
+      - ./docker-data/pg:/var/lib/postgresql/data
       - ./scripts/init-pg.sql:/docker-entrypoint-initdb.d/init-pg.sql
       - ./scripts/init-postgres.sql:/docker-entrypoint-initdb.d/init-postgres.sql
     networks:
@@ -264,6 +272,7 @@ services:
     command: mongod --wiredTigerCacheSizeGB 0.25
     ports:
       - "${MONGO_PORT:-27017}:27017"
+    restart: unless-stopped
     environment:
       MONGO_INITDB_ROOT_USERNAME: ${MONGO_USER:-socialhub}
       MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD:-socialhub_secret}
@@ -274,7 +283,7 @@ services:
           cpus: '0.5'
           memory: 384M
     volumes:
-      - mongo-data:/data/db
+      - ./docker-data/mongo:/data/db
     networks:
       - app-network
     healthcheck:
@@ -288,13 +297,14 @@ services:
     command: redis-server --maxmemory 64mb --maxmemory-policy allkeys-lru
     ports:
       - "${REDIS_PORT:-6379}:6379"
+    restart: unless-stopped
     deploy:
       resources:
         limits:
           cpus: '0.5'
           memory: 128M
     volumes:
-      - redis-data:/data
+      - ./docker-data/redis:/data
     networks:
       - app-network
     healthcheck:
@@ -308,6 +318,7 @@ services:
     ports:
       - "${MINIO_PORT:-9000}:9000"
       - "9001:9001"
+    restart: unless-stopped
     environment:
       MINIO_ROOT_USER: ${MINIO_ACCESS_KEY:-socialhub_minio}
       MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY:-socialhub_minio_secret}
@@ -317,7 +328,7 @@ services:
           cpus: '0.5'
           memory: 256M
     volumes:
-      - minio-data:/data
+      - ./docker-data/minio:/data
     command: server /data --console-address ":9001"
     networks:
       - app-network
@@ -332,6 +343,7 @@ services:
     ports:
       - "${RABBITMQ_PORT:-5672}:5672"
       - "${RABBITMQ_MANAGEMENT_PORT:-15672}:15672"
+    restart: unless-stopped
     environment:
       RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-socialhub}
       RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-socialhub_secret}
@@ -341,6 +353,8 @@ services:
         limits:
           cpus: '0.5'
           memory: 384M
+    volumes:
+      - ./docker-data/rabbitmq:/var/lib/rabbitmq
     networks:
       - app-network
     healthcheck:
@@ -353,8 +367,4 @@ networks:
   app-network:
     driver: bridge
 
-volumes:
-  pg-data:
-  mongo-data:
-  redis-data:
-  minio-data:
+# Volumes are now using bind mounts, so root level volumes are no longer needed
