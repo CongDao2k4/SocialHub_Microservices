@@ -54,42 +54,14 @@ Thay vì dùng TryCloudflare sinh ra URL ngẫu nhiên mỗi lần chạy, ta s�
 3. Chọn **Cloudflared** -> Nhấn **Next**.
 4. Đặt tên Tunnel là `local-backend` -> Nhấn **Save tunnel**.
 5. **Cài đặt Connector**:
-   - Chọn hệ điều hành máy tính local của bạn (ví dụ: `Windows`).
-    - Mở PowerShell/Terminal dưới quyền Administrator trên máy tính và chạy câu lệnh vừa copy để cài đặt `cloudflared` làm Background Service. 
-    - > [!WARNING]
-      > **XỬ LÝ LỖI "service is already installed"**: Nếu PowerShell báo lỗi dịch vụ đã được cài đặt sẵn từ trước, hãy chạy 2 lệnh sau bằng quyền Administrator để gỡ bỏ dịch vụ cũ và cài lại dịch vụ mới:
-      > 1. Gỡ bỏ dịch vụ cũ:
-      >    ```powershell
-      >    cloudflared service uninstall
-      >    ```
-      > 2. Chạy lại câu lệnh cài đặt service với token mới của bạn (câu lệnh copy trên Cloudflare Dashboard).
-      > 3. Khởi động lại dịch vụ nếu cần:
-      >    ```powershell
-      >    Start-Service cloudflared
-      >    ```
-      > *Hoặc nếu bạn chỉ muốn chạy thử nhanh (không cài service ngầm), bạn có thể chạy trực tiếp bằng lệnh:*
-      > ```powershell
-      > cloudflared tunnel run --token <TOKEN_CỦA_BẠN>
-      > ```
-      > *Cài Service ngầm thì dùng lệnh:*
-      > ```powershell
-      > cloudflared service install <TOKEN_CỦA_BẠN>
-      > ```
-      > *Sau đó chạy*
-      > ```cmd
-      > net start Cloudflared
-      > sc qc Cloudflared
-      > ```
-    - Khi connector hiển thị trạng thái `Active` (màu xanh) trên dashboard của Cloudflare, nhấn **Next**.
-
-   - **Cách 2: Cài Docker Cloudfare**
+   - **Cách cài theo Docker Container Cloudfare**
     - Tạo file `docker-compose.yml` trong thư mục `root\cloudfare-tunnel`
     - Tạo `.env` trong thư mục `root\cloudfare-tunnel`
      - ```env
        CLOUDFLARE_TUNNEL_TOKEN=your-tunnel-token
        ``` 
     - ```yaml
-      version: '3.8'
+      version: "3.8"
       services:
         cloudflared:
           image: cloudflare/cloudflared:latest
@@ -97,20 +69,23 @@ Thay vì dùng TryCloudflare sinh ra URL ngẫu nhiên mỗi lần chạy, ta s�
           restart: unless-stopped
           env_file:
             - .env
-          environment:
-            - CLOUDFLARE_TUNNEL_TOKEN=${CLOUDFLARE_TUNNEL_TOKEN}
           command:
             - tunnel
             - --no-autoupdate
             - run
             - --token
             - ${CLOUDFLARE_TUNNEL_TOKEN}
-
+          networks:
+            - app-network
           logging:
             driver: json-file
             options:
               max-size: "10m"
               max-file: "3"
+      networks:
+        app-network:
+          external: true
+          name: socialhub_app-network
       ``` 
     - Chạy lệnh: docker compose up -d
 
@@ -134,6 +109,10 @@ Thay vì dùng TryCloudflare sinh ra URL ngẫu nhiên mỗi lần chạy, ta s�
     - Nhấn **Save tunnel** hoặc **Save hostname**.
 
 *Từ lúc này, đường dẫn `https://api-local.yourdomain.com` sẽ cố định và trỏ thẳng về backend local của bạn.*
+
+#### Lưu ý: nếu muốn nhiều máy docker local chạy thì cần tạo Tunnel khác nhau ra. Tên tên miền phải khác nhau. Ví dụ: 
+- Máy 1: `api-local-1.yourdomain.com` -> `http://gateway:8000`
+- Máy 2: `api-local-2.yourdomain.com` -> `http://gateway:8000`
 
 ### Bước 2: Cấu hình biến môi trường trên Vercel
 1. Đăng nhập vào [Vercel Dashboard](https://vercel.com/) -> Chọn dự án `socialhub-frontend`.
