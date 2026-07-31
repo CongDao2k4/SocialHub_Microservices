@@ -100,14 +100,21 @@ export default (io, socket) => {
 
       console.log(`📡 [SOCKET] Event message:read from user=${userId} in conversation=${conversationId}, messageId=${messageId}`);
 
-      if (!conversationId || !messageId) {
-        return socket.emit('error', { message: 'conversationId and messageId are required' });
+      if (!conversationId) {
+        return socket.emit('error', { message: 'conversationId is required' });
       }
 
-      // Find target message
-      const readMessage = await Message.findById(messageId);
+      let readMessage;
+      if (messageId) {
+        readMessage = await Message.findById(messageId);
+      } else {
+        // Fallback: find the latest message in this conversation
+        readMessage = await Message.findOne({ conversationId }).sort({ createdAt: -1 });
+      }
+
       if (!readMessage) {
-        return socket.emit('error', { message: 'Message not found' });
+        // No messages or message not found, nothing to do
+        return;
       }
 
       const readAt = new Date();
@@ -127,7 +134,7 @@ export default (io, socket) => {
       // Broadcast read receipt to room
       io.to(`conv:${conversationId}`).emit('message:read:ack', {
         conversationId,
-        messageId,
+        messageId: readMessage._id.toString(),
         readBy: userId,
         readAt: readAt.toISOString()
       });
