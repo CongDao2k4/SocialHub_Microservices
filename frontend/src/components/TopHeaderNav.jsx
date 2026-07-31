@@ -22,7 +22,7 @@ import {
 
 const TopHeaderNav = () => {
     const { user } = useAuth();
-    const { unreadCount, setUnreadCount, onlineUsers } = useSocket();
+    const { unreadCount, setUnreadCount, onlineUsers, chatSocket } = useSocket();
     const navigate = useNavigate();
 
     // Quản lý dropdown đang mở: 'friends' | 'messages' | 'notifications' | null
@@ -116,6 +116,38 @@ const TopHeaderNav = () => {
         return () => window.removeEventListener("notification-received", handleNewNotification);
     }, []);
 
+    // Lắng nghe socket tin nhắn realtime để cập nhật danh sách hội thoại dropdown
+    useEffect(() => {
+        if (!chatSocket) return;
+
+        const handleMessageReceived = () => {
+            fetchConversations();
+        };
+
+        const handleReadAck = (ack) => {
+            setConversations(prev => prev.map(c => {
+                const id = c.id || c._id;
+                if (String(id) === String(ack.conversationId)) {
+                    return {
+                        ...c,
+                        unreadCount: 0,
+                        isUnread: false,
+                        lastMessage: c.lastMessage ? { ...c.lastMessage, isRead: true } : c.lastMessage
+                    };
+                }
+                return c;
+            }));
+        };
+
+        chatSocket.on("message:received", handleMessageReceived);
+        chatSocket.on("message:read:ack", handleReadAck);
+
+        return () => {
+            chatSocket.off("message:received", handleMessageReceived);
+            chatSocket.off("message:read:ack", handleReadAck);
+        };
+    }, [chatSocket]);
+
     // Tính số lượng cuộc trò chuyện chưa đọc
     const unreadMessagesCount = conversations.reduce((acc, conv) => {
         const isUnread = conv.unreadCount > 0 || conv.isUnread || 
@@ -187,6 +219,14 @@ const TopHeaderNav = () => {
             }
             return c;
         }));
+
+        // Gửi socket đánh dấu đã đọc
+        if (chatSocket && conv.lastMessage && (conv.lastMessage.senderId || conv.lastMessage.sender) !== user?.id) {
+            chatSocket.emit("message:read", {
+                conversationId: convId,
+                messageId: conv.lastMessage.id || conv.lastMessage._id || null
+            });
+        }
 
         window.dispatchEvent(new CustomEvent("open-chat-conversation", { detail: conv }));
     };
@@ -440,14 +480,14 @@ const TopHeaderNav = () => {
                                 </div>
                             ) : (
                                 conversations.map((conv) => {
-                                    const isGroup = conv.isGroup;
+                                    const isGroup = conv.isGroup || conv.type === "group";
                                     let avatar = "https://api.dicebear.com/7.x/adventurer/svg?seed=Felix";
                                     let name = "Cuộc trò chuyện";
                                     let partnerId = null;
 
                                     if (isGroup) {
-                                        name = conv.name || "Nhóm trò chuyện";
-                                        avatar = `https://api.dicebear.com/7.x/shapes/svg?seed=${conv.id || conv._id}`;
+                                        name = conv.groupRef?.name || conv.name || "Nhóm trò chuyện";
+                                        avatar = conv.groupRef?.avatarUrl || `https://api.dicebear.com/7.x/shapes/svg?seed=${conv.id || conv._id}`;
                                     } else {
                                         const otherMember = conv.participants?.find(p => (p.userId || p.id) !== user?.id);
                                         if (otherMember) {

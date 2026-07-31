@@ -5,9 +5,10 @@ import { useSocket } from "../context/SocketContext";
 import { X, Send, Loader, Image, Phone, Video, Mic } from "lucide-react";
 import VoiceMessagePlayer from "./chat/VoiceMessagePlayer";
 import VoiceRecorder from "./chat/VoiceRecorder";
+import ImageLightboxModal from "./ImageLightboxModal";
 
 // Component con tải hình ảnh an toàn thông qua Axios (hỗ trợ headers như Authorization và ngrok-skip-browser-warning)
-const ChatImage = ({ mediaId }) => {
+const ChatImage = ({ mediaId, onClick }) => {
     const [imageUrl, setImageUrl] = useState("");
     const [isLoading, setIsLoading] = useState(true);
 
@@ -65,7 +66,7 @@ const ChatImage = ({ mediaId }) => {
             src={imageUrl.url}
             alt="Attached"
             className="rounded-lg max-h-48 object-contain cursor-pointer hover:opacity-90 transition"
-            onClick={() => window.open(imageUrl.url, "_blank")}
+            onClick={onClick}
         />
     );
 };
@@ -155,6 +156,17 @@ const ChatBox = ({ conversation, onClose, currentUserId }) => {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [isRecording, setIsRecording] = useState(false);
     const fileInputRef = useRef(null);
+    const [activeLightboxUrl, setActiveLightboxUrl] = useState(null);
+
+    const handleOpenLightbox = async (mId) => {
+        try {
+            const res = await api.get(`/media/file/${mId}?variant=original`, { responseType: "blob" });
+            const objUrl = URL.createObjectURL(res.data);
+            setActiveLightboxUrl(objUrl);
+        } catch (err) {
+            console.error("❌ Lỗi tải ảnh chất lượng cao gốc:", err.message);
+        }
+    };
 
     // Guard: conversation không hợp lệ thì không render
     if (!conversation || (!conversation._id && !conversation.id)) {
@@ -173,13 +185,13 @@ const ChatBox = ({ conversation, onClose, currentUserId }) => {
         userId: ""
     };
 
-    const isGroup = conversation.type === "group" || conversation.isGroup;
+    const isGroup = conversation.type === "group" || conversation.isGroup || (conversation.groupRef !== undefined && conversation.groupRef !== null) || (conversation.participants && conversation.participants.length > 2);
     const chatTitle = isGroup
-        ? conversation.groupRef?.name || conversation.name || "Cuộc trò chuyện nhóm"
+        ? conversation.name || conversation.groupRef?.name || "Cuộc trò chuyện nhóm"
         : otherParticipant.displayName || otherParticipant.name || "Người dùng";
     
     const chatAvatar = isGroup
-        ? conversation.groupRef?.avatarUrl || `https://api.dicebear.com/7.x/identicon/svg?seed=${conversationId}`
+        ? conversation.avatarUrl || conversation.groupRef?.avatarUrl || `https://api.dicebear.com/7.x/identicon/svg?seed=${conversationId}`
         : otherParticipant.avatarUrl || "https://api.dicebear.com/7.x/adventurer/svg?seed=Felix";
         
     const chatSubtitle = isGroup
@@ -205,6 +217,18 @@ const ChatBox = ({ conversation, onClose, currentUserId }) => {
 
         fetchMessages();
     }, [conversationId]);
+
+    // 1aa. Đánh dấu đã đọc khi danh sách tin nhắn thay đổi hoặc socket kết nối
+    useEffect(() => {
+        if (!chatSocket || messages.length === 0) return;
+        const lastMsg = messages[messages.length - 1];
+        if (lastMsg && lastMsg.senderId !== currentUserId) {
+            chatSocket.emit("message:read", {
+                conversationId,
+                messageId: lastMsg.id || lastMsg._id
+            });
+        }
+    }, [conversationId, messages, chatSocket, currentUserId]);
 
     // 1b. Join và tự động Re-join room Websocket khi socket mất kết nối rồi tự kết nối lại (reconnect)
     useEffect(() => {
@@ -491,7 +515,7 @@ const ChatBox = ({ conversation, onClose, currentUserId }) => {
                                     {msg.type === "image" && msg.mediaId ? (
                                         <div className={`flex flex-col space-y-1 ${isMe ? "items-end" : "items-start"}`}>
                                             <div className="overflow-hidden rounded-2xl border border-slate-200 bg-black/5">
-                                                <ChatImage mediaId={msg.mediaId} />
+                                                <ChatImage mediaId={msg.mediaId} onClick={() => handleOpenLightbox(msg.mediaId)} />
                                             </div>
                                             {msg.content && msg.content !== "Sent an image" && (
                                                 <div className={`px-3 py-1.5 rounded-2xl text-xs leading-relaxed break-words shadow-sm ${
@@ -617,6 +641,16 @@ const ChatBox = ({ conversation, onClose, currentUserId }) => {
                     </div>
                 )}
             </form>
+
+            {activeLightboxUrl && (
+                <ImageLightboxModal
+                    imageUrl={activeLightboxUrl}
+                    onClose={() => {
+                        URL.revokeObjectURL(activeLightboxUrl);
+                        setActiveLightboxUrl(null);
+                    }}
+                />
+            )}
         </div>
     );
 };
