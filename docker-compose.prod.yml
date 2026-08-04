@@ -1,0 +1,347 @@
+# ─────────────────────────────────────────────────────────────────────────
+# SocialHub — Production Docker Compose (Oracle Cloud VM)
+# Run: docker compose -f docker-compose.prod.yml up -d
+# ─────────────────────────────────────────────────────────────────────────
+
+services:
+  # ─── API Gateway ─────────────────────────────────
+  gateway:
+    image: ghcr.io/minhtuan1102/socialhub-gateway:latest
+    ports:
+      - "${GATEWAY_PORT:-8080}:8000"
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'        # Max half CPU core
+          memory: 256M       # Max 256MB RAM
+        reservations:
+          cpus: '0.1'
+          memory: 128M
+    depends_on:
+      user-service:
+        condition: service_healthy
+      media-service:
+        condition: service_healthy
+    env_file:
+      - .env
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:8000/health').then(r => r.ok ? process.exit(0) : process.exit(1)).catch(() => process.exit(1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ─── user-service (Identity & Access) ────────────
+  user-service:
+    image: ghcr.io/minhtuan1102/socialhub-user-service:latest
+    ports:
+      - "${USER_SERVICE_PORT:-5001}:5000"
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+        reservations:
+          cpus: '0.1'
+          memory: 128M
+    env_file:
+      - .env
+    environment:
+      - PG_DATABASE=socialhub_user
+    depends_on:
+      pg:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:5000/health').then(r => r.ok ? process.exit(0) : process.exit(1)).catch(() => process.exit(1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ─── friend-service (Social Graph) ───────────────
+  friend-service:
+    image: ghcr.io/minhtuan1102/socialhub-friend-service:latest
+    ports:
+      - "${FRIEND_SERVICE_PORT:-5002}:5000"
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+        reservations:
+          cpus: '0.1'
+          memory: 128M
+    env_file:
+      - .env
+    environment:
+      - PG_DATABASE=socialhub_friend
+    depends_on:
+      pg:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:5000/health').then(r => r.ok ? process.exit(0) : process.exit(1)).catch(() => process.exit(1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ─── post-service (Content) ──────────────────────
+  post-service:
+    image: ghcr.io/minhtuan1102/socialhub-post-service:latest
+    ports:
+      - "${POST_SERVICE_PORT:-5003}:5000"
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+        reservations:
+          cpus: '0.1'
+          memory: 128M
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql://${PG_USER:-socialhub}:${PG_PASSWORD:-socialhub_secret}@pg:5432/socialhub_post?schema=public
+    depends_on:
+      pg:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:5000/health').then(r => r.ok ? process.exit(0) : process.exit(1)).catch(() => process.exit(1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ─── chat-service (Chat & Websockets) ────────────
+  chat-service:
+    image: ghcr.io/minhtuan1102/socialhub-chat-service:latest
+    ports:
+      - "${CHAT_SERVICE_PORT:-5004}:5000"
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+        reservations:
+          cpus: '0.1'
+          memory: 128M
+    env_file:
+      - .env
+    environment:
+      - MONGO_URI=mongodb://${MONGO_USER:-socialhub}:${MONGO_PASSWORD:-socialhub_secret}@mongo:27017/${MONGO_DATABASE:-socialhub}?authSource=admin
+    depends_on:
+      mongo:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:5000/health').then(r => r.ok ? process.exit(0) : process.exit(1)).catch(() => process.exit(1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ─── media-service (Media) ───────────────────────
+  media-service:
+    image: ghcr.io/minhtuan1102/socialhub-media-service:latest
+    ports:
+      - "${MEDIA_SERVICE_PORT:-5005}:5000"
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '1.5'
+          memory: 1024M
+        reservations:
+          cpus: '0.3'
+          memory: 256M
+    env_file:
+      - .env
+    environment:
+      - MINIO_PORT=9000
+    depends_on:
+      minio:
+        condition: service_healthy
+      mongo:
+        condition: service_healthy
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:5000/health').then(r => r.ok ? process.exit(0) : process.exit(1)).catch(() => process.exit(1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ─── notification-service (Notification) ─────────
+  notification-service:
+    image: ghcr.io/minhtuan1102/socialhub-notification-service:latest
+    ports:
+      - "${NOTIFICATION_SERVICE_PORT:-5006}:5000"
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+        reservations:
+          cpus: '0.1'
+          memory: 128M
+    env_file:
+      - .env
+    depends_on:
+      mongo:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:5000/health').then(r => r.ok ? process.exit(0) : process.exit(1)).catch(() => process.exit(1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ─── Infrastructure ─────────────────────────────
+
+  pg:
+    image: postgres:16-alpine
+    command: postgres -c shared_buffers=128MB -c max_connections=50
+    ports:
+      - "${PG_HOST_PORT:-5432}:5432"
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${PG_DATABASE:-socialhub}
+      POSTGRES_USER: ${PG_USER:-socialhub}
+      POSTGRES_PASSWORD: ${PG_PASSWORD:-socialhub_secret}
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+    volumes:
+      - ./docker-data/pg:/var/lib/postgresql/data
+      - ./scripts/init-pg.sql:/docker-entrypoint-initdb.d/init-pg.sql
+      - ./scripts/init-postgres.sql:/docker-entrypoint-initdb.d/init-postgres.sql
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${PG_USER:-socialhub}"]
+      interval: 60s
+      timeout: 30s
+      retries: 5
+
+  mongo:
+    image: mongo:7
+    command: mongod --wiredTigerCacheSizeGB 0.25
+    ports:
+      - "${MONGO_PORT:-27017}:27017"
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_USER:-socialhub}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD:-socialhub_secret}
+      MONGO_INITDB_DATABASE: ${MONGO_DATABASE:-socialhub}
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 384M
+    volumes:
+      - ./docker-data/mongo:/data/db
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 60s
+      timeout: 30s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    command: redis-server --maxmemory 64mb --maxmemory-policy allkeys-lru
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 128M
+    volumes:
+      - ./docker-data/redis:/data
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 60s
+      timeout: 30s
+      retries: 5
+
+  minio:
+    image: minio/minio
+    ports:
+      - "${MINIO_PORT:-9000}:9000"
+      - "9001:9001"
+    restart: unless-stopped
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY:-socialhub_minio}
+      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY:-socialhub_minio_secret}
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+    volumes:
+      - ./docker-data/minio:/data
+    command: server /data --console-address ":9001"
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 60s
+      timeout: 30s
+      retries: 5
+
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    ports:
+      - "${RABBITMQ_PORT:-5672}:5672"
+      - "${RABBITMQ_MANAGEMENT_PORT:-15672}:15672"
+    restart: unless-stopped
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-socialhub}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-socialhub_secret}
+      RABBITMQ_SERVER_MEMORY_AVAILABLE_LIMIT: 256
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 384M
+    volumes:
+      - ./docker-data/rabbitmq:/var/lib/rabbitmq
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 60s
+      timeout: 30s
+      retries: 5
+
+networks:
+  app-network:
+    driver: bridge
