@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { X, ExternalLink, ChevronLeft, ChevronRight } from "lucide-react";
 
 /**
@@ -55,9 +56,9 @@ const ImageLightboxModal = ({
 
     if (!currentUrl) return null;
 
-    return (
+    return createPortal(
         <div 
-            className="fixed inset-0 z-50 bg-black/90 backdrop-blur-md flex items-center justify-center p-4 animate-fadeIn select-none"
+            className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-md flex items-center justify-center p-4 animate-fadeIn select-none"
             onClick={onClose}
         >
             {/* Nút Đóng */}
@@ -131,7 +132,8 @@ const ImageLightboxModal = ({
                     />
                 )}
             </div>
-        </div>
+        </div>,
+        document.body
     );
 };
 

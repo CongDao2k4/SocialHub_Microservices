@@ -73,7 +73,7 @@ const Layout = () => {
             )}
 
             {/* Header Top Bar Mobile (Chỉ hiện trên di động < 768px) */}
-            <header className="md:hidden fixed top-0 inset-x-0 h-14 bg-white/90 backdrop-blur-md border-b border-slate-200/80 px-4 flex items-center justify-between z-40 shadow-sm">
+            <header className="md:hidden fixed top-0 inset-x-0 h-14 bg-white/90 backdrop-blur-md border-b border-slate-200/80 px-4 flex items-center justify-between z-50 shadow-sm">
                 <Link to="/" className="flex items-center space-x-2">
                     <img src="/logo.svg" alt="SocialHub Logo" className="w-8 h-8 object-contain" />
                     <span className="text-lg font-extrabold text-slate-800 tracking-tight">SocialHub</span>
@@ -156,7 +156,7 @@ const Layout = () => {
             </aside>
 
             {/* Top Navbar Header Cố Định (Desktop >= 768px) */}
-            <header className="hidden md:flex fixed top-0 right-0 left-64 h-14 bg-white/95 backdrop-blur-md border-b border-slate-200/80 px-6 items-center justify-end z-30 shadow-sm">
+            <header className="hidden md:flex fixed top-0 right-0 left-64 h-14 bg-white/95 backdrop-blur-md border-b border-slate-200/80 px-6 items-center justify-end z-50 shadow-sm">
                 {/* Nhóm Icon Hành Động: Bạn bè -> Tin nhắn -> Thông báo */}
                 <TopHeaderNav />
             </header>
