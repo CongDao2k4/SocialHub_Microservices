@@ -1,33 +1,12 @@
 # ─────────────────────────────────────────────────────────────────────────
-# SocialHub — Docker Compose
-# Run: docker compose up --build
+# SocialHub — Production Docker Compose (Oracle Cloud VM)
+# Run: docker compose -f docker-compose.prod.yml up -d
 # ─────────────────────────────────────────────────────────────────────────
 
 services:
-  # ─── Frontend ────────────────────────────────────
-  # frontend:
-  #   build:
-  #     context: ./frontend
-  #     args:
-  #       - VITE_API_URL=http://localhost:${GATEWAY_PORT:-8080}/api
-  #   ports:
-  #     - "${FRONTEND_PORT:-3000}:3000"
-  #   deploy:
-  #     resources:
-  #       limits:
-  #         cpus: '0.3'        # Limit CPU usage
-  #         memory: 128M       # Limit RAM usage (very light as Nginx serves static assets)
-  #       reservations:
-  #         cpus: '0.1'
-  #         memory: 64M
-  #   depends_on:
-  #     - gateway
-  #   networks:
-  #     - app-network
-
   # ─── API Gateway ─────────────────────────────────
   gateway:
-    build: ./gateway
+    image: ghcr.io/minhtuan1102/socialhub-gateway:latest
     ports:
       - "${GATEWAY_PORT:-8080}:8000"
     restart: unless-stopped
@@ -56,7 +35,7 @@ services:
 
   # ─── user-service (Identity & Access) ────────────
   user-service:
-    build: ./services/user-service
+    image: ghcr.io/minhtuan1102/socialhub-user-service:latest
     ports:
       - "${USER_SERVICE_PORT:-5001}:5000"
     restart: unless-stopped
@@ -87,7 +66,7 @@ services:
 
   # ─── friend-service (Social Graph) ───────────────
   friend-service:
-    build: ./services/friend-service
+    image: ghcr.io/minhtuan1102/socialhub-friend-service:latest
     ports:
       - "${FRIEND_SERVICE_PORT:-5002}:5000"
     restart: unless-stopped
@@ -118,7 +97,7 @@ services:
 
   # ─── post-service (Content) ──────────────────────
   post-service:
-    build: ./services/post-service
+    image: ghcr.io/minhtuan1102/socialhub-post-service:latest
     ports:
       - "${POST_SERVICE_PORT:-5003}:5000"
     restart: unless-stopped
@@ -149,7 +128,7 @@ services:
 
   # ─── chat-service (Chat & Websockets) ────────────
   chat-service:
-    build: ./services/chat-service
+    image: ghcr.io/minhtuan1102/socialhub-chat-service:latest
     ports:
       - "${CHAT_SERVICE_PORT:-5004}:5000"
     restart: unless-stopped
@@ -180,7 +159,7 @@ services:
 
   # ─── media-service (Media) ───────────────────────
   media-service:
-    build: ./services/media-service
+    image: ghcr.io/minhtuan1102/socialhub-media-service:latest
     ports:
       - "${MEDIA_SERVICE_PORT:-5005}:5000"
     restart: unless-stopped
@@ -211,7 +190,7 @@ services:
 
   # ─── notification-service (Notification) ─────────
   notification-service:
-    build: ./services/notification-service
+    image: ghcr.io/minhtuan1102/socialhub-notification-service:latest
     ports:
       - "${NOTIFICATION_SERVICE_PORT:-5006}:5000"
     restart: unless-stopped
@@ -366,5 +345,3 @@ services:
 networks:
   app-network:
     driver: bridge
-
-# Volumes are now using bind mounts, so root level volumes are no longer needed
