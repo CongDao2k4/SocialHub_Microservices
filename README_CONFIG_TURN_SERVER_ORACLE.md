@@ -403,10 +403,11 @@ Mặc định Oracle Cloud khóa toàn bộ cổng kết nối đi vào ngoại 
    # Nếu dùng distro khác (CentOS/Rocky/Alma): sudo dnf install -y epel-release
 
    # Tải coturn + TẤT CẢ dependencies xuống thư mục local (KHÔNG cài lên máy local)
+   # Dùng "dnf download" (KHÔNG phải "dnf install --downloadonly" vì lệnh đó bỏ qua package đã cài)
    mkdir -p ~/coturn-rpms
-   sudo dnf install --downloadonly --downloaddir=$HOME/coturn-rpms coturn
-
-   # Kiểm tra đã tải xong
+   sudo dnf download --resolve --destdir=$HOME/coturn-rpms coturn postgresql-libs
+   # postgresql-libs cung cấp libpq.so.5 mà turnserver binary cần để khởi động
+   
    ls -lh ~/coturn-rpms/
    # Phải thấy file coturn-*.rpm và các dependency RPMs
    ```
@@ -428,37 +429,57 @@ Mặc định Oracle Cloud khóa toàn bộ cổng kết nối đi vào ngoại 
    ```bash
    # === CHẠY TRÊN ORACLE VM ===
 
-   # Cài tất cả RPMs offline (rpm là chương trình C, chỉ tốn ~10 MB RAM)
-   sudo rpm -ivh /tmp/*.rpm 2>/dev/null || sudo rpm -Uvh --force /tmp/*.rpm
+   # 3a. Kiểm tra file RPM đã nhận đủ chưa (BẮT BUỘC phải thấy coturn-*.rpm)
+   ls -lh /tmp/*.rpm
+   # Kết quả đúng phải có ít nhất:
+   #   coturn-4.15.0-1.el9.x86_64.rpm    (~374K)
+   #   hiredis-1.0.2-2.el9.x86_64.rpm    (~48K)
+   #   libmicrohttpd-*.rpm                (~86K)
+   #   mariadb-connector-c-*.rpm          (~206K)
+   #
+   # ⚠️ Nếu KHÔNG thấy file coturn-*.rpm → quay lại Bước 2 SCP lại toàn bộ ~/coturn-rpms/
 
-   # Kiểm tra coturn đã cài thành công
+   # 3b. Cài tất cả RPMs offline, bỏ qua dependency PostgreSQL (--nodeps)
+   # --force: bỏ qua package đã cài sẵn (như info), vẫn cài nốt package mới (coturn)
+   # --nodeps: bỏ qua dependency libpq/PostgreSQL (không cần vì dùng user tĩnh trong config)
+   sudo rpm -ivh --nodeps --force /tmp/*.rpm
+
+   # 3c. Kiểm tra coturn đã cài thành công
    which turnserver
-   turnserver --version
-   # Phải thấy đường dẫn /usr/bin/turnserver và số phiên bản
+   # Kết quả đúng: /usr/bin/turnserver
 
-   # Dọn dẹp file RPM tạm
+   turnserver --version
+   # Kết quả đúng: Coturn-4.15.0 ...
+
+   rpm -qa | grep coturn
+   # Kết quả đúng: coturn-4.15.0-1.el9.x86_64
+
+   # 3d. Dọn dẹp file RPM tạm
    rm -f /tmp/*.rpm
    ```
 
    > [!TIP]
    > **Không có WSL OracleLinux?** Bạn có thể dùng bất kỳ phương pháp nào để có môi trường RHEL 9/Oracle Linux 9 trên máy local:
-   > - **Docker** (nhanh nhất): `docker run --rm -v ~/coturn-rpms:/out oraclelinux:9 bash -c 'dnf install -y oracle-epel-release-el9 && dnf install --downloadonly --downloaddir=/out coturn'`
+   > - **Docker** (nhanh nhất): `docker run --rm -v ~/coturn-rpms:/out oraclelinux:9 bash -c 'dnf install -y oracle-epel-release-el9 && dnf download --resolve --destdir=/out coturn'`
    > - **Máy Linux khác** (Ubuntu/Debian): Dùng Docker command ở trên
    > - **Máy ảo thứ 2** trên Oracle Cloud (ARM Ampere 6 GB RAM): Chạy `dnf install` bình thường, rồi `scp` RPMs sang VM AMD
 
 ##### A3. Tạo tệp cấu hình `turnserver.conf` (đã tối ưu RAM):
 
-   ```bash
-   # Coturn cài qua dnf sẽ đọc config từ /etc/coturn/turnserver.conf
-   sudo mkdir -p /etc/coturn
-   sudo mkdir -p /var/log/coturn
-   sudo nano /etc/coturn/turnserver.conf
-   ```
+   Coturn cài từ RPM (Bước A2) đặt file config mặc định tại `/etc/coturn/turnserver.conf`. Ta sẽ ghi đè bằng cấu hình tối ưu cho VM ~500 MB RAM:
 
-   Dán nội dung cấu hình sau vào tệp:
-   ```ini
+   ```bash
+   # Tạo thư mục log nếu chưa có
+   sudo mkdir -p /var/log/coturn
+
+   # Sao lưu config mặc định (nếu có)
+   [ -f /etc/coturn/turnserver.conf ] && sudo cp /etc/coturn/turnserver.conf /etc/coturn/turnserver.conf.bak
+
+   # Ghi đè config mới bằng tee (không cần mở nano)
+   sudo tee /etc/coturn/turnserver.conf > /dev/null <<'EOF'
    # ============================================================
    # Coturn Server Configuration — Tối ưu cho Oracle Free Tier ~500MB RAM
+   # Cài đặt qua RPM (Bước A2) — Config path: /etc/coturn/turnserver.conf
    # ============================================================
 
    # --- Cổng lắng nghe chính cho STUN/TURN ---
@@ -481,8 +502,10 @@ Mặc định Oracle Cloud khóa toàn bộ cổng kết nối đi vào ngoại 
 
    # --- Cấu hình NAT ---
    # (Bắt buộc đối với Oracle Cloud VM vì VM nằm sau 1-to-1 NAT VCN)
-   # Định dạng: external-ip=<IP_PUBLIC_TĨNH_ORACLE>/<IP_PRIVATE_NỘI_BỘ_ORACLE>
-   # Ví dụ: external-ip=140.238.12.34/10.0.0.150
+   #     THAY THẾ 2 giá trị dưới đây bằng IP thực tế của VM:
+   #   - IP_PUBLIC  = Reserved Public IP (xem ở OCI Console > VM > tab Networks)
+   #   - IP_PRIVATE = Kết quả lệnh: hostname -I | awk '{print $1}'
+   # Ví dụ: external-ip=140.238.12.34/10.0.0.173
    external-ip=<IP_PUBLIC_TĨNH_ORACLE>/<IP_PRIVATE_NỘI_BỘ_ORACLE>
 
    # --- Tắt CLI và Multicast ---
@@ -514,8 +537,24 @@ Mặc định Oracle Cloud khóa toàn bộ cổng kết nối đi vào ngoại 
    # Không lưu log chi tiết từng packet (rất tốn RAM)
    # (Chỉ bật dòng dưới khi debug, TUYỆT ĐỐI KHÔNG bật trên production)
    # verbose
+   EOF
+
+   # ⚠️ THAY IP thực tế vào config (thay 2 giá trị trong lệnh sed dưới đây)
+   sudo sed -i 's|<IP_PUBLIC_TĨNH_ORACLE>|161.118.222.40|; s|<IP_PRIVATE_NỘI_BỘ_ORACLE>|10.0.0.173|' /etc/coturn/turnserver.conf
+   # ^ Thay 161.118.222.40 bằng Reserved Public IP thực tế của VM
+   # ^ Thay 10.0.0.173 bằng kết quả lệnh: hostname -I | awk '{print $1}'
    ```
-   *Nhấn `Ctrl + O` -> `Enter` để lưu, và `Ctrl + X` để thoát.*
+
+   Kiểm tra config hợp lệ trước khi chạy service:
+   ```bash
+   # Test thử config (sẽ in lỗi nếu config sai cú pháp)
+   sudo turnserver -c /etc/coturn/turnserver.conf --check-origin-consistency
+   # Nếu không có lỗi in ra → config OK
+
+   # Kiểm tra file config đã lưu đúng
+   cat /etc/coturn/turnserver.conf | grep external-ip
+   # Phải thấy: external-ip=<IP_PUBLIC>/<IP_PRIVATE> (với IP thực tế, KHÔNG phải placeholder)
+   ```
 
    > [!IMPORTANT]
    > **Giải thích các tham số tối ưu RAM quan trọng:**
@@ -856,8 +895,12 @@ sudo iptables -L INPUT --line-numbers -n
    # Xác nhận kết quả — REJECT (nếu có) phải ở CUỐI, ACCEPT ở trên
    sudo iptables -L INPUT --line-numbers -n
 
-   # Lưu vĩnh viễn
-   sudo service iptables save
+   # Lưu vĩnh viễn (Chọn lệnh tương ứng với cách lưu ở Bước 2d):
+   # Cách A: Nếu bạn dùng systemd iptables-restore.service (Khuyên dùng/Không cần package):
+   sudo mkdir -p /etc/sysconfig && sudo iptables-save | sudo tee /etc/sysconfig/iptables
+
+   # Cách B: Nếu bạn đã cài đặt package iptables-services qua dnf thành công:
+   # sudo service iptables save
    ```
 
 #### Kiểm tra OCI Security List nếu iptables đã đúng mà vẫn không thông:
