@@ -194,7 +194,13 @@ Mặc định Oracle Cloud khóa toàn bộ cổng kết nối đi vào ngoại 
    sudo iptables -L INPUT --line-numbers -n
    ```
 
-   Kết quả mặc định của Oracle Linux trông như sau:
+   Kết quả sẽ thuộc **một trong hai trường hợp** dưới đây. Hãy xác định đúng trường hợp của bạn rồi làm theo hướng dẫn tương ứng:
+
+   ---
+
+   #### 🅰️ Trường hợp A: Chain INPUT có sẵn các rule mặc định và dòng REJECT ở cuối (Oracle Linux chuẩn)
+
+   Kết quả trông như sau:
    ```
    num  target   prot  source      destination
    1    ACCEPT   all   ...         (RELATED,ESTABLISHED)
@@ -204,7 +210,7 @@ Mặc định Oracle Cloud khóa toàn bộ cổng kết nối đi vào ngoại 
    5    REJECT   all   ...         ← Chặn tất cả traffic còn lại
    ```
 
-   **Bước 2b**: Chèn rule ACCEPT vào **vị trí 5** (ngay TRƯỚC dòng REJECT):
+   **Bước 2b (A)**: Chèn rule ACCEPT vào **vị trí 5** (ngay TRƯỚC dòng REJECT):
    ```bash
    # Chèn vào vị trí 5 = đẩy REJECT xuống, rule mới nằm trước REJECT
    sudo iptables -I INPUT 5 -p udp --dport 3478 -j ACCEPT
@@ -212,7 +218,7 @@ Mặc định Oracle Cloud khóa toàn bộ cổng kết nối đi vào ngoại 
    sudo iptables -I INPUT 5 -p udp --dport 49152:49200 -j ACCEPT
    ```
 
-   **Bước 2c**: Kiểm tra lại — 3 rule mới phải xuất hiện TRƯỚC dòng REJECT:
+   **Bước 2c (A)**: Kiểm tra lại — 3 rule mới phải xuất hiện TRƯỚC dòng REJECT:
    ```bash
    sudo iptables -L INPUT --line-numbers -n
    # Kết quả đúng:
@@ -222,101 +228,487 @@ Mặc định Oracle Cloud khóa toàn bộ cổng kết nối đi vào ngoại 
    # 8    REJECT   all  ...  ← REJECT phải ở CUỐI
    ```
 
-   **Bước 2d**: Lưu cấu hình vĩnh viễn (Oracle Linux dùng `dnf`, **không** dùng `apt-get`):
-   ```bash
-   # Cài iptables-services nếu chưa có
-   sudo dnf install -y iptables-services
+   ---
 
-   # Bật dịch vụ iptables tự khởi động cùng hệ thống
-   sudo systemctl enable iptables
-   sudo systemctl start iptables
+   #### 🅱️ Trường hợp B: Chain INPUT hoàn toàn trống, policy ACCEPT (Một số image Oracle Linux / ARM Ampere)
 
-   # Lưu các rule hiện tại vào file cấu hình vĩnh viễn
-   sudo service iptables save
+   > [!IMPORTANT]
+   > **Lỗi `iptables: Index of insertion too big`** xảy ra khi bạn chạy `-I INPUT 5` nhưng chain INPUT đang **trống hoàn toàn** (không có rule nào), nên vị trí 5 không tồn tại.
+
+   Kết quả trông như sau:
    ```
+   Chain INPUT (policy ACCEPT)
+   num  target     prot opt source               destination
+                    ← TRỐNG, KHÔNG CÓ RULE NÀO
+   ```
+
+   Vì không có dòng REJECT nào chặn traffic, policy `ACCEPT` mặc định đã cho phép tất cả lưu lượng đi vào. Tuy nhiên, bạn **vẫn nên thêm rule tường minh** để phòng trường hợp ai đó thêm rule DROP/REJECT sau này.
+
+   **Bước 2b (B)**: Dùng `-A` (append) thay vì `-I` (insert) để thêm rule vào cuối chain:
+   ```bash
+   # Append rule vào cuối chain (không cần chỉ định vị trí)
+   sudo iptables -A INPUT -p udp --dport 3478 -j ACCEPT
+   sudo iptables -A INPUT -p tcp --dport 3478 -j ACCEPT
+   sudo iptables -A INPUT -p udp --dport 49152:49200 -j ACCEPT
+   ```
+
+   **Bước 2c (B)**: Kiểm tra lại — 3 rule mới phải xuất hiện trong chain:
+   ```bash
+   sudo iptables -L INPUT --line-numbers -n
+   # Kết quả đúng:
+   # 1    ACCEPT   udp  ...  udp dpt:3478
+   # 2    ACCEPT   tcp  ...  tcp dpt:3478
+   # 3    ACCEPT   udp  ...  udp dpts:49152:49200
+   ```
+
+   ---
+
+   **Bước 2d** (Chung cho cả hai trường hợp): Lưu cấu hình vĩnh viễn.
+
+   > [!CAUTION]
+   > **VM AMD Free Tier thực tế chỉ có ~500 MB RAM** (không phải 1 GB — kernel và firmware chiếm nửa còn lại). Lệnh `dnf install` tiêu tốn ~500-700 MB RAM khi giải quyết dependencies → bị Linux OOM Killer giết chết (hiện thông báo `Killed`) ngay cả khi đã có Swap. **Bắt buộc phải tạo Swap trước** khi chạy bất kỳ lệnh `dnf` nào.
+
+   **Bước 2d.1**: Tạo Swap File 2 GB (chạy **một lần duy nhất**, giữ vĩnh viễn):
+   ```bash
+   # Tạo file swap 2GB
+   sudo fallocate -l 2G /swapfile
+   sudo chmod 600 /swapfile
+   sudo mkswap /swapfile
+   sudo swapon /swapfile
+
+   # Ép Linux ưu tiên swap mạnh (mặc định = 30, tăng lên 100)
+   sudo sysctl vm.swappiness=100
+   # Lưu vĩnh viễn qua reboot
+   echo 'vm.swappiness=100' | sudo tee -a /etc/sysctl.conf
+
+   # Kiểm tra swap đã hoạt động
+   free -h
+   # Phải thấy dòng Swap: total ≥ 2.0Gi
+
+   # Ghi vào fstab để swap tự kích hoạt khi reboot
+   echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
+   ```
+
+   **Bước 2d.2** (✅ **Khuyên dùng**): Lưu rule thủ công **KHÔNG cần cài thêm package nào**:
+
+   > [!IMPORTANT]
+   > Trên VM chỉ ~500 MB RAM, `dnf install iptables-services` rất hay bị `Killed` dù đã có swap. Phương pháp dưới đây dùng `iptables-save` (có sẵn trong OS) + systemd service tự tạo, **không cần cài đặt gì thêm**:
+
+   ```bash
+   # Xả RAM cache trước khi thao tác
+   sudo sh -c 'echo 3 > /proc/sys/vm/drop_caches'
+
+   # Tạo thư mục lưu rule nếu chưa có
+   sudo mkdir -p /etc/sysconfig
+
+   # Lưu toàn bộ iptables rule hiện tại ra file
+   sudo iptables-save | sudo tee /etc/sysconfig/iptables
+
+   # Tạo systemd service để tự nạp lại rule khi VM khởi động
+   sudo tee /etc/systemd/system/iptables-restore.service > /dev/null <<'EOF'
+   [Unit]
+   Description=Restore iptables rules on boot
+   Before=network-pre.target
+   Wants=network-pre.target
+
+   [Service]
+   Type=oneshot
+   ExecStart=/usr/sbin/iptables-restore /etc/sysconfig/iptables
+   RemainAfterExit=yes
+
+   [Install]
+   WantedBy=multi-user.target
+   EOF
+
+   # Kích hoạt service chạy tự động khi boot
+   sudo systemctl daemon-reload
+   sudo systemctl enable iptables-restore.service
+
+   # Kiểm tra service đã enable thành công
+   sudo systemctl is-enabled iptables-restore.service
+   # Kết quả đúng: enabled
+   ```
+
+   > [!TIP]
+   > **Phương án thay thế** — Nếu muốn thử cài `iptables-services` (cách truyền thống), hãy xả RAM + cache trước:
+   > ```bash
+   > # Xả cache và ép swap trước khi chạy dnf
+   > sudo sh -c 'echo 3 > /proc/sys/vm/drop_caches'
+   > sudo sysctl vm.swappiness=100
+   > sudo dnf install -y --setopt=install_weak_deps=False iptables-services
+   >
+   > # Nếu thành công:
+   > sudo systemctl enable iptables
+   > sudo systemctl start iptables
+   > sudo service iptables save
+   > ```
+
 
    > [!WARNING]
    > **Bẫy phổ biến**: Rule `-I INPUT 1` chèn vào **đầu** chain, trông có vẻ đúng nhưng thực tế **không hiệu quả** nếu rule số 3 `ACCEPT all` đang match trước (các gói tin đã được ACCEPT trước khi tới rule của bạn). Luôn xem `iptables -L INPUT --line-numbers -n` trước để biết chính xác vị trí REJECT và chèn ngay trước nó.
 
 ---
 
-### Bước 4.5: Cài đặt Docker & Cấu hình Coturn
+### Bước 4.5: Cài đặt & Cấu hình Coturn
 
-1. Cài đặt Docker trên máy ảo **Oracle Linux** (dùng `dnf`, không phải `apt-get`):
-   ```bash
-   # Thêm Docker CE repository chính thức
-   sudo dnf config-manager --add-repo https://download.docker.com/linux/rhel/docker-ce.repo
+> [!CAUTION]
+> **Chọn đúng phương án cho VM của bạn:**
+>
+> | VM Type | RAM thực tế | Phương án |
+> |---|---|---|
+> | **AMD Micro** (VM.Standard.E2.1.Micro) | **~500 MB** | ✅ **Phương án A**: Cài trực tiếp (KHÔNG Docker) |
+> | **ARM Ampere** (VM.Standard.A1.Flex — 6GB) | **~5.5 GB** | Phương án A hoặc B đều OK |
+>
+> **Tại sao VM AMD ~500 MB RAM không nên dùng Docker?**
+>
+> | Thành phần | Có Docker | Không Docker |
+> |---|---|---|
+> | Oracle Linux OS | ~150-200 MB | ~150-200 MB |
+> | Docker daemon (chạy nền 24/7) | **~100-150 MB** | ❌ **0 MB** |
+> | Coturn process | ~30-50 MB | ~20-40 MB |
+> | **Tổng** | **~280-400 MB (56-80%)** | **~170-240 MB (34-48%)** |
+>
+> Docker daemon ngốn **100-150 MB RAM chỉ để quản lý container** — trên VM 500 MB đó là 20-30% RAM lãng phí hoàn toàn. Cài Coturn trực tiếp lên OS tiết kiệm hơn rất nhiều.
 
-   # Cài đặt Docker CE và các thành phần liên quan
-   sudo dnf install -y docker-ce docker-ce-cli containerd.io
+---
 
-   # Khởi động Docker và bật tự khởi động cùng hệ thống
-   sudo systemctl start docker
-   sudo systemctl enable docker
+#### ✅ Phương án A: Cài Coturn trực tiếp lên OS (Khuyên dùng cho VM AMD ~500 MB RAM)
 
-   # Thêm user opc vào nhóm docker để chạy docker không cần sudo (tuỳ chọn)
-   sudo usermod -aG docker opc
-   # Đăng xuất và đăng nhập lại để áp dụng quyền nhóm
-   # hoặc # Áp dụng quyền nhóm docker ngay lập tức mà không cần thoát SSH
-   newgrp docker
-   ```
+##### A1. Lấy địa chỉ IP nội bộ (Internal Private IP):
 
-2. Lấy địa chỉ IP nội bộ (Internal Private IP) của máy ảo trong giao diện mạng VNIC:
    ```bash
    hostname -I | awk '{print $1}'
    ```
    *(Ghi lại địa chỉ IP nội bộ này, ví dụ: `10.0.0.150`)*.
 
-3. Tạo thư mục và tệp cấu hình `turnserver.conf`:
+##### A2. Cài đặt Coturn:
+
+   > [!CAUTION]
+   > **VM AMD ~500 MB RAM KHÔNG THỂ chạy `dnf` trực tiếp** — `dnf` (Python) tiêu tốn ~400-700 MB RAM, vượt quá tổng RAM vật lý. Dù có 2.5 GB swap, OOM Killer sẽ giết `dnf` trước khi kernel kịp swap, hoặc nếu bảo vệ OOM thì **toàn bộ VM sẽ đơ** (thrash swap vô tận). **Phải dùng phương pháp tải RPM từ máy local rồi chuyển lên VM.**
+
+   ---
+
+   **✅ Phương pháp duy nhất hoạt động — Tải RPM trên máy local, SCP lên VM, cài offline:**
+
+   > [!IMPORTANT]
+   > Phương pháp này dùng máy tính cá nhân (có nhiều RAM) để tải RPMs, rồi chuyển file lên Oracle VM và cài bằng `rpm` (chương trình C, chỉ tốn ~10 MB RAM — không bao giờ bị OOM kill).
+
+   **Bước 1** — Trên **máy tính cá nhân** (WSL OracleLinux, Docker, hoặc bất kỳ máy Linux nào có ≥ 2 GB RAM):
+
    ```bash
-   sudo mkdir -p /opt/coturn
-   sudo nano /opt/coturn/turnserver.conf
+   # === CHẠY TRÊN MÁY LOCAL (WSL / máy tính cá nhân) ===
+
+   # Cài EPEL repo (nếu chưa có)
+   sudo dnf install -y oracle-epel-release-el9
+   # Nếu dùng distro khác (CentOS/Rocky/Alma): sudo dnf install -y epel-release
+
+   # Tải coturn + TẤT CẢ dependencies xuống thư mục local (KHÔNG cài lên máy local)
+   mkdir -p ~/coturn-rpms
+   sudo dnf install --downloadonly --downloaddir=$HOME/coturn-rpms coturn
+
+   # Kiểm tra đã tải xong
+   ls -lh ~/coturn-rpms/
+   # Phải thấy file coturn-*.rpm và các dependency RPMs
    ```
-4. Dán nội dung cấu hình sau vào tệp:
+
+   **Bước 2** — Chuyển RPMs lên Oracle VM:
+
+   ```bash
+   # === VẪN CHẠY TRÊN MÁY LOCAL ===
+
+   # SCP toàn bộ RPMs lên Oracle VM
+   scp -i ~/.ssh/oracle-key.pem ~/coturn-rpms/*.rpm opc@<IP_ORACLE_VM>:/tmp/
+
+   # Hoặc nếu dùng PowerShell trên Windows:
+   # scp -i key_oracle\ssh-key-2026-07-22.key coturn-rpms\*.rpm opc@<IP_ORACLE_VM>:/tmp/
+   ```
+
+   **Bước 3** — Trên **Oracle VM** (SSH vào VM), cài offline:
+
+   ```bash
+   # === CHẠY TRÊN ORACLE VM ===
+
+   # Cài tất cả RPMs offline (rpm là chương trình C, chỉ tốn ~10 MB RAM)
+   sudo rpm -ivh /tmp/*.rpm 2>/dev/null || sudo rpm -Uvh --force /tmp/*.rpm
+
+   # Kiểm tra coturn đã cài thành công
+   which turnserver
+   turnserver --version
+   # Phải thấy đường dẫn /usr/bin/turnserver và số phiên bản
+
+   # Dọn dẹp file RPM tạm
+   rm -f /tmp/*.rpm
+   ```
+
+   > [!TIP]
+   > **Không có WSL OracleLinux?** Bạn có thể dùng bất kỳ phương pháp nào để có môi trường RHEL 9/Oracle Linux 9 trên máy local:
+   > - **Docker** (nhanh nhất): `docker run --rm -v ~/coturn-rpms:/out oraclelinux:9 bash -c 'dnf install -y oracle-epel-release-el9 && dnf install --downloadonly --downloaddir=/out coturn'`
+   > - **Máy Linux khác** (Ubuntu/Debian): Dùng Docker command ở trên
+   > - **Máy ảo thứ 2** trên Oracle Cloud (ARM Ampere 6 GB RAM): Chạy `dnf install` bình thường, rồi `scp` RPMs sang VM AMD
+
+##### A3. Tạo tệp cấu hình `turnserver.conf` (đã tối ưu RAM):
+
+   ```bash
+   # Coturn cài qua dnf sẽ đọc config từ /etc/coturn/turnserver.conf
+   sudo mkdir -p /etc/coturn
+   sudo mkdir -p /var/log/coturn
+   sudo nano /etc/coturn/turnserver.conf
+   ```
+
+   Dán nội dung cấu hình sau vào tệp:
    ```ini
-   # Cổng lắng nghe chính cho STUN/TURN
+   # ============================================================
+   # Coturn Server Configuration — Tối ưu cho Oracle Free Tier ~500MB RAM
+   # ============================================================
+
+   # --- Cổng lắng nghe chính cho STUN/TURN ---
    listening-port=3478
 
-   # Cơ chế bảo mật và xác thực
+   # --- Cơ chế bảo mật và xác thực ---
    fingerprint
    lt-cred-mech
 
-   # Tên miền của bạn (Realm)
+   # --- Tên miền (Realm) ---
    realm=turn.socialhubzz.cloud
 
-   # Tài khoản kết nối (Định dạng: username:password)
+   # --- Tài khoản kết nối ---
    user=socialhub_user:socialhub_secret_pass
 
-   # Giới hạn dải cổng truyền tải Media (Trùng khớp với cổng đã mở trên OCI Security List & IPTables)
+   # --- Giới hạn dải cổng truyền tải Media ---
+   # (Trùng khớp với cổng đã mở trên OCI Security List & IPTables)
    min-port=49152
    max-port=49200
 
-   # Cấu hình NAT (Bắt buộc đối với Oracle Cloud VM vì VM nằm sau 1-to-1 NAT VCN)
+   # --- Cấu hình NAT ---
+   # (Bắt buộc đối với Oracle Cloud VM vì VM nằm sau 1-to-1 NAT VCN)
    # Định dạng: external-ip=<IP_PUBLIC_TĨNH_ORACLE>/<IP_PRIVATE_NỘI_BỘ_ORACLE>
    # Ví dụ: external-ip=140.238.12.34/10.0.0.150
    external-ip=<IP_PUBLIC_TĨNH_ORACLE>/<IP_PRIVATE_NỘI_BỘ_ORACLE>
 
-   # Tắt CLI và Multicast để tăng hiệu năng và bảo mật
+   # --- Tắt CLI và Multicast ---
    no-cli
    no-multicast-peers
+
+   # ============================================================
+   # TỐI ƯU RAM CHO VM ~500 MB (BẮT BUỘC TRÊN FREE TIER AMD)
+   # ============================================================
+
+   # Giới hạn băng thông tối đa mỗi phiên TURN = 512 Kbps
+   # (Đủ cho video call 720p, ngăn 1 phiên ngốn toàn bộ RAM buffer)
+   max-bps=512000
+
+   # Tổng băng thông cho TẤT CẢ các phiên cùng lúc = 10 Mbps
+   # (Phù hợp với VM 1/4 vCPU, ngăn quá tải)
+   total-quota=10000
+
+   # Giới hạn số phiên relay đồng thời tối đa mỗi user
+   user-quota=20
+
+   # Tự động dọn dẹp nonce cũ sau 600 giây (giải phóng bộ nhớ)
+   stale-nonce=600
+
+   # Bật simple-log thay vì verbose log (giảm I/O và memory buffer)
+   simple-log
+   log-file=/var/log/coturn/turnserver.log
+
+   # Không lưu log chi tiết từng packet (rất tốn RAM)
+   # (Chỉ bật dòng dưới khi debug, TUYỆT ĐỐI KHÔNG bật trên production)
+   # verbose
    ```
    *Nhấn `Ctrl + O` -> `Enter` để lưu, và `Ctrl + X` để thoát.*
 
-5. Chạy Docker container khởi tạo Coturn Server:
+   > [!IMPORTANT]
+   > **Giải thích các tham số tối ưu RAM quan trọng:**
+   >
+   > | Tham số | Mặc định | Đã set | Tác dụng |
+   > |---|---|---|---|
+   > | `max-bps` | Không giới hạn | `512000` (512 Kbps) | Giới hạn bandwidth mỗi phiên, ngăn 1 user ngốn hết RAM buffer |
+   > | `total-quota` | Không giới hạn | `10000` (10 Mbps) | Tổng bandwidth tất cả phiên, ngăn quá tải CPU/RAM |
+   > | `user-quota` | Không giới hạn | `20` | Tối đa 20 relay cùng lúc/user |
+   > | `stale-nonce` | Không bật | `600` giây | Tự dọn nonce cũ, giải phóng memory |
+   > | `no-cli` | CLI bật | Tắt | Tiết kiệm ~10 MB RAM (CLI server) |
+
+##### A4. Tạo systemd service để Coturn chạy tự động 24/7:
+
    ```bash
+   # Tạo systemd service cho Coturn
+   sudo tee /etc/systemd/system/coturn.service > /dev/null <<'EOF'
+   [Unit]
+   Description=Coturn TURN/STUN Server
+   After=network.target
+   Documentation=https://github.com/coturn/coturn
+
+   [Service]
+   Type=simple
+   ExecStart=/usr/bin/turnserver -c /etc/coturn/turnserver.conf
+   Restart=always
+   RestartSec=5
+   LimitNOFILE=65536
+
+   # Giới hạn RAM tối đa cho process Coturn = 256 MB
+   # (Tương đương --memory=256m của Docker nhưng không cần Docker)
+   MemoryMax=256M
+   MemoryHigh=128M
+
+   [Install]
+   WantedBy=multi-user.target
+   EOF
+
+   # Kích hoạt và khởi động Coturn
+   sudo systemctl daemon-reload
+   sudo systemctl enable coturn
+   sudo systemctl start coturn
+
+   # Kiểm tra trạng thái
+   sudo systemctl status coturn
+   ```
+
+   > [!NOTE]
+   > **Coturn có tự chạy lại nếu crash không?** — **CÓ, hoàn toàn tự động!**
+   > - `Restart=always` + `RestartSec=5`: Nếu Coturn crash vì bất kỳ lý do gì → systemd **tự khởi động lại** sau 5 giây.
+   > - `MemoryMax=256M`: Nếu Coturn vượt 256 MB RAM → systemd tự kill và restart (tương đương `--memory` của Docker).
+   > - `MemoryHigh=128M`: Systemd sẽ **throttle** (làm chậm) process khi vượt 128 MB, ép nó giải phóng bộ nhớ trước khi bị kill.
+   > - Nếu VM reboot → systemd tự khởi động Coturn cùng OS nhờ `WantedBy=multi-user.target`.
+   >
+   > **Kết luận**: Hành vi tương đương `docker run --restart always --memory=256m` nhưng **tiết kiệm ~100-150 MB RAM** vì không cần Docker daemon.
+
+##### A5. Cấu hình log rotation (tránh log phình to chiếm disk):
+
+   ```bash
+   sudo tee /etc/logrotate.d/coturn > /dev/null <<'EOF'
+   /var/log/coturn/turnserver.log {
+       daily
+       rotate 3
+       maxsize 5M
+       compress
+       missingok
+       notifempty
+       postrotate
+           systemctl reload coturn > /dev/null 2>&1 || true
+       endscript
+   }
+   EOF
+   ```
+
+##### A6. Kiểm tra hoạt động:
+
+   ```bash
+   # Xem trạng thái Coturn
+   sudo systemctl status coturn
+
+   # Xem log gần nhất
+   sudo journalctl -u coturn --no-pager -n 20
+
+   # Kiểm tra port 3478 đang lắng nghe
+   sudo ss -tulnp | grep 3478
+
+   # Kiểm tra RAM — Coturn chỉ nên chiếm ~20-40 MB
+   free -h
+   ps aux --sort=-%mem | head -10
+
+   # Xem số lần Coturn đã bị restart (nếu có)
+   sudo systemctl show coturn --property=NRestarts
+   ```
+
+---
+
+#### 📦 Phương án B: Cài qua Docker (Dành cho VM có ≥ 1 GB RAM thực tế — ARM Ampere 6GB)
+
+> [!WARNING]
+> **KHÔNG khuyên dùng cho VM AMD ~500 MB RAM.** Docker daemon chiếm ~100-150 MB RAM chạy nền 24/7. Chỉ dùng phương án này nếu VM của bạn có ≥ 1 GB RAM thực tế (ví dụ ARM Ampere A1.Flex với 6 GB RAM).
+
+<details>
+<summary><strong>👉 Nhấp để mở hướng dẫn cài Docker + Coturn (cho VM ≥ 1GB RAM)</strong></summary>
+
+##### B1. Cài đặt Docker:
+
+   ```bash
+   # Xả RAM cache
+   sudo sh -c 'echo 3 > /proc/sys/vm/drop_caches'
+
+   # Thêm Docker CE repository chính thức
+   sudo dnf config-manager --add-repo https://download.docker.com/linux/rhel/docker-ce.repo
+
+   # Cài đặt Docker CE
+   sudo dnf install -y --setopt=install_weak_deps=False docker-ce docker-ce-cli containerd.io
+
+   # Dọn cache dnf
+   sudo dnf clean all
+   ```
+
+##### B2. Cấu hình Docker Daemon tiết kiệm RAM:
+
+   ```bash
+   sudo mkdir -p /etc/docker
+   sudo tee /etc/docker/daemon.json > /dev/null <<'EOF'
+   {
+     "log-driver": "json-file",
+     "log-opts": {
+       "max-size": "5m",
+       "max-file": "2"
+     },
+     "storage-driver": "overlay2"
+   }
+   EOF
+   ```
+
+##### B3. Khởi động Docker:
+
+   ```bash
+   sudo systemctl start docker
+   sudo systemctl enable docker
+   sudo usermod -aG docker opc
+   newgrp docker
+   ```
+
+##### B4. Lấy IP nội bộ, tạo turnserver.conf:
+
+   Giống hệt **Bước A1** và **Bước A3** ở Phương án A phía trên, nhưng đặt file config ở `/opt/coturn/turnserver.conf`:
+   ```bash
+   sudo mkdir -p /opt/coturn
+   sudo nano /opt/coturn/turnserver.conf
+   ```
+   *(Dán nội dung cấu hình giống hệt Bước A3)*
+
+##### B5. Chạy Docker container Coturn (có giới hạn RAM):
+
+   ```bash
+   sudo mkdir -p /opt/coturn/logs
+
    sudo docker run -d \
      --name coturn-server \
      --network host \
      --restart always \
+     --memory=256m \
+     --memory-swap=384m \
+     --memory-reservation=128m \
      -v /opt/coturn/turnserver.conf:/etc/coturn/turnserver.conf \
+     -v /opt/coturn/logs:/var/log/coturn \
      coturn/coturn
    ```
 
-6. Kiểm tra nhật ký container xem Coturn đã sẵn sàng chưa:
+   > [!NOTE]
+   > **Container tự restart nếu crash** nhờ `--restart always`. Docker có exponential backoff: 100ms → 200ms → ... → tối đa 1 phút, ngăn crash loop.
+
+##### B6. Kiểm tra:
+
    ```bash
    sudo docker ps
    sudo docker logs coturn-server
+   docker stats --no-stream --format "table {{.Name}}\t{{.MemUsage}}\t{{.MemPerc}}"
+
+   # Xem lịch sử restart
+   docker inspect coturn-server --format='Restarts: {{.RestartCount}}, Last Start: {{.State.StartedAt}}'
    ```
+
+##### B7. Dọn dẹp:
+
+   ```bash
+   docker system prune -f
+   free -h
+   ```
+
+</details>
 
 ---
 
@@ -437,22 +829,36 @@ sudo iptables -L INPUT --line-numbers -n
 # Phải thấy rule ACCEPT cho port 3478 (udp+tcp) NẰM TRƯỚC dòng REJECT
 ```
 
-#### Fix iptables nếu thiếu rule (Oracle Linux mặc định có REJECT ở dòng 5):
-```bash
-# Xem vị trí dòng REJECT hiện tại
-sudo iptables -L INPUT --line-numbers -n
+#### Fix iptables nếu thiếu rule:
+   ```bash
+   # Xem vị trí dòng REJECT hiện tại
+   sudo iptables -L INPUT --line-numbers -n
+   ```
 
-# Chèn ACCEPT ngay TRƯỚC dòng REJECT (thường là vị trí 5)
-sudo iptables -I INPUT 5 -p udp --dport 3478 -j ACCEPT
-sudo iptables -I INPUT 5 -p tcp --dport 3478 -j ACCEPT
-sudo iptables -I INPUT 5 -p udp --dport 49152:49200 -j ACCEPT
+   **Nếu chain có rule REJECT** (Oracle Linux chuẩn — REJECT thường ở dòng 5):
+   ```bash
+   # Chèn ACCEPT ngay TRƯỚC dòng REJECT (thay số 5 bằng vị trí thực tế của REJECT)
+   sudo iptables -I INPUT 5 -p udp --dport 3478 -j ACCEPT
+   sudo iptables -I INPUT 5 -p tcp --dport 3478 -j ACCEPT
+   sudo iptables -I INPUT 5 -p udp --dport 49152:49200 -j ACCEPT
+   ```
 
-# Xác nhận kết quả — REJECT phải ở CUỐI, ACCEPT ở trên
-sudo iptables -L INPUT --line-numbers -n
+   **Nếu chain INPUT trống hoàn toàn** (policy ACCEPT, không có rule nào → lỗi `Index of insertion too big`):
+   ```bash
+   # Dùng -A (append) thay vì -I (insert) vì không có rule nào để chèn trước
+   sudo iptables -A INPUT -p udp --dport 3478 -j ACCEPT
+   sudo iptables -A INPUT -p tcp --dport 3478 -j ACCEPT
+   sudo iptables -A INPUT -p udp --dport 49152:49200 -j ACCEPT
+   ```
 
-# Lưu vĩnh viễn
-sudo service iptables save
-```
+   **Xác nhận và lưu kết quả:**
+   ```bash
+   # Xác nhận kết quả — REJECT (nếu có) phải ở CUỐI, ACCEPT ở trên
+   sudo iptables -L INPUT --line-numbers -n
+
+   # Lưu vĩnh viễn
+   sudo service iptables save
+   ```
 
 #### Kiểm tra OCI Security List nếu iptables đã đúng mà vẫn không thông:
 - Vào OCI Console → Instance → Tab **Networking** → **Subnet** → **Security Lists** → **Default Security List**
