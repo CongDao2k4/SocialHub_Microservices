@@ -403,10 +403,11 @@ Mặc định Oracle Cloud khóa toàn bộ cổng kết nối đi vào ngoại 
    # Nếu dùng distro khác (CentOS/Rocky/Alma): sudo dnf install -y epel-release
 
    # Tải coturn + TẤT CẢ dependencies xuống thư mục local (KHÔNG cài lên máy local)
+   # Dùng "dnf download" (KHÔNG phải "dnf install --downloadonly" vì lệnh đó bỏ qua package đã cài)
    mkdir -p ~/coturn-rpms
-   sudo dnf install --downloadonly --downloaddir=$HOME/coturn-rpms coturn
-
-   # Kiểm tra đã tải xong
+   sudo dnf download --resolve --destdir=$HOME/coturn-rpms coturn postgresql-libs
+   # postgresql-libs cung cấp libpq.so.5 mà turnserver binary cần để khởi động
+   
    ls -lh ~/coturn-rpms/
    # Phải thấy file coturn-*.rpm và các dependency RPMs
    ```
@@ -428,37 +429,57 @@ Mặc định Oracle Cloud khóa toàn bộ cổng kết nối đi vào ngoại 
    ```bash
    # === CHẠY TRÊN ORACLE VM ===
 
-   # Cài tất cả RPMs offline (rpm là chương trình C, chỉ tốn ~10 MB RAM)
-   sudo rpm -ivh /tmp/*.rpm 2>/dev/null || sudo rpm -Uvh --force /tmp/*.rpm
+   # 3a. Kiểm tra file RPM đã nhận đủ chưa (BẮT BUỘC phải thấy coturn-*.rpm)
+   ls -lh /tmp/*.rpm
+   # Kết quả đúng phải có ít nhất:
+   #   coturn-4.15.0-1.el9.x86_64.rpm    (~374K)
+   #   hiredis-1.0.2-2.el9.x86_64.rpm    (~48K)
+   #   libmicrohttpd-*.rpm                (~86K)
+   #   mariadb-connector-c-*.rpm          (~206K)
+   #
+   # ⚠️ Nếu KHÔNG thấy file coturn-*.rpm → quay lại Bước 2 SCP lại toàn bộ ~/coturn-rpms/
 
-   # Kiểm tra coturn đã cài thành công
+   # 3b. Cài tất cả RPMs offline, bỏ qua dependency PostgreSQL (--nodeps)
+   # --force: bỏ qua package đã cài sẵn (như info), vẫn cài nốt package mới (coturn)
+   # --nodeps: bỏ qua dependency libpq/PostgreSQL (không cần vì dùng user tĩnh trong config)
+   sudo rpm -ivh --nodeps --force /tmp/*.rpm
+
+   # 3c. Kiểm tra coturn đã cài thành công
    which turnserver
-   turnserver --version
-   # Phải thấy đường dẫn /usr/bin/turnserver và số phiên bản
+   # Kết quả đúng: /usr/bin/turnserver
 
-   # Dọn dẹp file RPM tạm
+   turnserver --version
+   # Kết quả đúng: Coturn-4.15.0 ...
+
+   rpm -qa | grep coturn
+   # Kết quả đúng: coturn-4.15.0-1.el9.x86_64
+
+   # 3d. Dọn dẹp file RPM tạm
    rm -f /tmp/*.rpm
    ```
 
    > [!TIP]
    > **Không có WSL OracleLinux?** Bạn có thể dùng bất kỳ phương pháp nào để có môi trường RHEL 9/Oracle Linux 9 trên máy local:
-   > - **Docker** (nhanh nhất): `docker run --rm -v ~/coturn-rpms:/out oraclelinux:9 bash -c 'dnf install -y oracle-epel-release-el9 && dnf install --downloadonly --downloaddir=/out coturn'`
+   > - **Docker** (nhanh nhất): `docker run --rm -v ~/coturn-rpms:/out oraclelinux:9 bash -c 'dnf install -y oracle-epel-release-el9 && dnf download --resolve --destdir=/out coturn'`
    > - **Máy Linux khác** (Ubuntu/Debian): Dùng Docker command ở trên
    > - **Máy ảo thứ 2** trên Oracle Cloud (ARM Ampere 6 GB RAM): Chạy `dnf install` bình thường, rồi `scp` RPMs sang VM AMD
 
 ##### A3. Tạo tệp cấu hình `turnserver.conf` (đã tối ưu RAM):
 
-   ```bash
-   # Coturn cài qua dnf sẽ đọc config từ /etc/coturn/turnserver.conf
-   sudo mkdir -p /etc/coturn
-   sudo mkdir -p /var/log/coturn
-   sudo nano /etc/coturn/turnserver.conf
-   ```
+   Coturn cài từ RPM (Bước A2) đặt file config mặc định tại `/etc/coturn/turnserver.conf`. Ta sẽ ghi đè bằng cấu hình tối ưu cho VM ~500 MB RAM:
 
-   Dán nội dung cấu hình sau vào tệp:
-   ```ini
+   ```bash
+   # Tạo thư mục log nếu chưa có
+   sudo mkdir -p /var/log/coturn
+
+   # Sao lưu config mặc định (nếu có)
+   [ -f /etc/coturn/turnserver.conf ] && sudo cp /etc/coturn/turnserver.conf /etc/coturn/turnserver.conf.bak
+
+   # Ghi đè config mới bằng tee (không cần mở nano)
+   sudo tee /etc/coturn/turnserver.conf > /dev/null <<'EOF'
    # ============================================================
    # Coturn Server Configuration — Tối ưu cho Oracle Free Tier ~500MB RAM
+   # Cài đặt qua RPM (Bước A2) — Config path: /etc/coturn/turnserver.conf
    # ============================================================
 
    # --- Cổng lắng nghe chính cho STUN/TURN ---
@@ -481,8 +502,10 @@ Mặc định Oracle Cloud khóa toàn bộ cổng kết nối đi vào ngoại 
 
    # --- Cấu hình NAT ---
    # (Bắt buộc đối với Oracle Cloud VM vì VM nằm sau 1-to-1 NAT VCN)
-   # Định dạng: external-ip=<IP_PUBLIC_TĨNH_ORACLE>/<IP_PRIVATE_NỘI_BỘ_ORACLE>
-   # Ví dụ: external-ip=140.238.12.34/10.0.0.150
+   #     THAY THẾ 2 giá trị dưới đây bằng IP thực tế của VM:
+   #   - IP_PUBLIC  = Reserved Public IP (xem ở OCI Console > VM > tab Networks)
+   #   - IP_PRIVATE = Kết quả lệnh: hostname -I | awk '{print $1}'
+   # Ví dụ: external-ip=140.238.12.34/10.0.0.173
    external-ip=<IP_PUBLIC_TĨNH_ORACLE>/<IP_PRIVATE_NỘI_BỘ_ORACLE>
 
    # --- Tắt CLI và Multicast ---
@@ -514,8 +537,24 @@ Mặc định Oracle Cloud khóa toàn bộ cổng kết nối đi vào ngoại 
    # Không lưu log chi tiết từng packet (rất tốn RAM)
    # (Chỉ bật dòng dưới khi debug, TUYỆT ĐỐI KHÔNG bật trên production)
    # verbose
+   EOF
+
+   # ⚠️ THAY IP thực tế vào config (thay 2 giá trị trong lệnh sed dưới đây)
+   sudo sed -i 's|<IP_PUBLIC_TĨNH_ORACLE>|161.118.222.40|; s|<IP_PRIVATE_NỘI_BỘ_ORACLE>|10.0.0.173|' /etc/coturn/turnserver.conf
+   # ^ Thay 161.118.222.40 bằng Reserved Public IP thực tế của VM
+   # ^ Thay 10.0.0.173 bằng kết quả lệnh: hostname -I | awk '{print $1}'
    ```
-   *Nhấn `Ctrl + O` -> `Enter` để lưu, và `Ctrl + X` để thoát.*
+
+   Kiểm tra config hợp lệ trước khi chạy service:
+   ```bash
+   # Test thử config (sẽ in lỗi nếu config sai cú pháp)
+   sudo turnserver -c /etc/coturn/turnserver.conf --check-origin-consistency
+   # Nếu không có lỗi in ra → config OK
+
+   # Kiểm tra file config đã lưu đúng
+   cat /etc/coturn/turnserver.conf | grep external-ip
+   # Phải thấy: external-ip=<IP_PUBLIC>/<IP_PRIVATE> (với IP thực tế, KHÔNG phải placeholder)
+   ```
 
    > [!IMPORTANT]
    > **Giải thích các tham số tối ưu RAM quan trọng:**
@@ -796,6 +835,36 @@ TURN_CREDENTIAL=social....
 5. Quan sát bảng kết quả:
    - Nếu xuất hiện dòng chứa từ **`relay`** ở cột **Type**, điều đó xác nhận gói tin media đã đi qua Coturn trên Oracle Cloud thành công 100%!
 
+### Cách 1: Xem qua Systemd Journal (Log khởi động/trạng thái dịch vụ)
+Vì bạn chạy Coturn dưới dạng systemd service (`coturn.service`), hệ thống sẽ capture lại các log khởi động và lỗi crash:
+
+*   **Xem toàn bộ log từ trước đến nay**:
+    ```bash
+    sudo journalctl -u coturn --no-pager
+    ```
+*   **Xem log trực tiếp theo thời gian thực (Real-time / Follow)**:
+    ```bash
+    sudo journalctl -u coturn -f
+    ```
+
+---
+
+### Cách 2: Xem file log của Coturn (Log kết nối/gói tin STUN/TURN)
+Vì trong file cấu hình `turnserver.conf` bạn đã chỉ định ghi log ra thư mục `/var/log/coturn/`:
+
+*   **Xem toàn bộ nội dung file log**:
+    ```bash
+    sudo cat /var/log/coturn/turnserver.log
+    ```
+*   **Xem 100 dòng log cuối cùng**:
+    ```bash
+    sudo tail -n 100 /var/log/coturn/turnserver.log
+    ```
+*   **Xem log kết nối trực tiếp (Real-time)** khi bạn đang ấn test trên trình duyệt:
+    ```bash
+    sudo tail -f /var/log/coturn/turnserver.log
+    ```
+
 ---
 
 ## 🛠️ 8. Hướng dẫn Xử lý Sự cố & Lưu ý Oracle Cloud (Troubleshooting)
@@ -856,8 +925,12 @@ sudo iptables -L INPUT --line-numbers -n
    # Xác nhận kết quả — REJECT (nếu có) phải ở CUỐI, ACCEPT ở trên
    sudo iptables -L INPUT --line-numbers -n
 
-   # Lưu vĩnh viễn
-   sudo service iptables save
+   # Lưu vĩnh viễn (Chọn lệnh tương ứng với cách lưu ở Bước 2d):
+   # Cách A: Nếu bạn dùng systemd iptables-restore.service (Khuyên dùng/Không cần package):
+   sudo mkdir -p /etc/sysconfig && sudo iptables-save | sudo tee /etc/sysconfig/iptables
+
+   # Cách B: Nếu bạn đã cài đặt package iptables-services qua dnf thành công:
+   # sudo service iptables save
    ```
 
 #### Kiểm tra OCI Security List nếu iptables đã đúng mà vẫn không thông:
@@ -877,6 +950,50 @@ sudo iptables -L INPUT --line-numbers -n
   # Ping định kỳ mỗi 5 phút để tránh bị thu hồi
   (crontab -l 2>/dev/null; echo "*/5 * * * * ping -c 1 8.8.8.8 > /dev/null 2>&1") | crontab -
   ```
+
+### Lỗi 4: Firewall Oracle
+
+Log của bạn cho thấy **Coturn đang hoạt động hoàn hảo và sẵn sàng** (đã gán thành công cổng relay vào IP nội bộ `10.0.0.173`). 
+
+Tuy nhiên, việc **không xuất hiện thêm bất kỳ dòng log mới nào** khi bạn bấm test trên trình duyệt xác nhận rằng: **Gói tin từ trình duyệt của bạn hoàn toàn chưa chạm được tới phần mềm Coturn trên VM** (đã bị chặn ở lớp mạng trước đó).
+
+Oracle Linux 9 mặc định sử dụng **`firewalld`** quản lý tường lửa chứ không dùng `iptables` thô. Nếu `firewalld` đang bật, nó sẽ chặn toàn bộ cổng bất kể bạn đã cấu hình `iptables` thế nào.
+
+Bạn hãy kiểm tra và chạy các bước sau trên Oracle VM:
+
+##### Bước 1: Kiểm tra xem `firewalld` có đang hoạt động không
+Chạy lệnh:
+```bash
+sudo systemctl status firewalld
+```
+*   Nếu kết quả báo **`active (running)`**, hãy chạy các lệnh sau để mở cổng trên `firewalld` (lệnh này sẽ ghi đè và mở cổng triệt để):
+    ```bash
+    # Mở cổng STUN/TURN (TCP & UDP)
+    sudo firewall-cmd --permanent --add-port=3478/tcp
+    sudo firewall-cmd --permanent --add-port=3478/udp
+
+    # Mở dải cổng truyền media (UDP)
+    sudo firewall-cmd --permanent --add-port=49152-49200/udp
+
+    # Load lại cấu hình tường lửa để áp dụng ngay lập tức
+    sudo firewall-cmd --reload
+    ```
+
+---
+
+##### Bước 2: Test kết nối TCP bằng PowerShell máy Local (Máy Windows)
+Mở PowerShell trên máy tính cá nhân của bạn và gõ:
+```powershell
+Test-NetConnection -ComputerName 129.150.46.248 -Port 3478
+```
+*   **Nếu `TcpTestSucceeded : True`**: Chúc mừng bạn, cổng đã thông! Hãy thử chạy lại test trên Trickle ICE. Lúc này trên cửa sổ log của Coturn (`tail -f`) sẽ nhảy log liên tục.
+*   **Nếu vẫn `False`**: Bạn chưa mở cổng `3478` trên **OCI Security List** (tường lửa của Oracle Web Console). 
+
+---
+
+##### Bước 3: Xác nhận lại bản ghi Cloudflare
+Đảm bảo bạn không bật Proxy (Đám mây màu cam 🟠) cho tên miền `turn.socialhubzz.cloud`. 
+*   Nếu đang bật đám mây màu cam, hãy chuyển sang **DNS Only (Đám mây màu xám 🔘)**.
 
 ---
 
