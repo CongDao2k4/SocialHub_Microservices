@@ -1,3 +1,5 @@
+import './decode-env.js';
+
 if (process.env.ENVIRONMENT === 'production') {
   console.log = () => { };
   console.info = () => { };

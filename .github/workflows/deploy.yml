@@ -3,7 +3,7 @@ name: CI/CD SocialHub Microservices - Oracle VM
 on:
   push:
     branches:
-      - feature/oracle_deploy
+      - main
 
 permissions:
   contents: read
@@ -89,9 +89,9 @@ jobs:
             cd ~/SocialHub_Microservices || exit 1
 
             echo "=== 2. CẬP NHẬT MÃ NGUỒN (LẤY DOCKER-COMPOSE.PROD.YML MỚI) ==="
-            git fetch origin feature/oracle_deploy
-            git checkout feature/oracle_deploy
-            git pull origin feature/oracle_deploy
+            git fetch origin main
+            git checkout main
+            git pull origin main
 
             echo "=== 3. ĐĂNG NHẬP VÀO GHCR TRÊN VM ==="
             # Sử dụng GitHub Token / Personal Access Token được chuyển tiếp hoặc login qua SSH key nếu cần
