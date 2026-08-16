@@ -835,6 +835,36 @@ TURN_CREDENTIAL=social....
 5. Quan sát bảng kết quả:
    - Nếu xuất hiện dòng chứa từ **`relay`** ở cột **Type**, điều đó xác nhận gói tin media đã đi qua Coturn trên Oracle Cloud thành công 100%!
 
+### Cách 1: Xem qua Systemd Journal (Log khởi động/trạng thái dịch vụ)
+Vì bạn chạy Coturn dưới dạng systemd service (`coturn.service`), hệ thống sẽ capture lại các log khởi động và lỗi crash:
+
+*   **Xem toàn bộ log từ trước đến nay**:
+    ```bash
+    sudo journalctl -u coturn --no-pager
+    ```
+*   **Xem log trực tiếp theo thời gian thực (Real-time / Follow)**:
+    ```bash
+    sudo journalctl -u coturn -f
+    ```
+
+---
+
+### Cách 2: Xem file log của Coturn (Log kết nối/gói tin STUN/TURN)
+Vì trong file cấu hình `turnserver.conf` bạn đã chỉ định ghi log ra thư mục `/var/log/coturn/`:
+
+*   **Xem toàn bộ nội dung file log**:
+    ```bash
+    sudo cat /var/log/coturn/turnserver.log
+    ```
+*   **Xem 100 dòng log cuối cùng**:
+    ```bash
+    sudo tail -n 100 /var/log/coturn/turnserver.log
+    ```
+*   **Xem log kết nối trực tiếp (Real-time)** khi bạn đang ấn test trên trình duyệt:
+    ```bash
+    sudo tail -f /var/log/coturn/turnserver.log
+    ```
+
 ---
 
 ## 🛠️ 8. Hướng dẫn Xử lý Sự cố & Lưu ý Oracle Cloud (Troubleshooting)
@@ -920,6 +950,50 @@ sudo iptables -L INPUT --line-numbers -n
   # Ping định kỳ mỗi 5 phút để tránh bị thu hồi
   (crontab -l 2>/dev/null; echo "*/5 * * * * ping -c 1 8.8.8.8 > /dev/null 2>&1") | crontab -
   ```
+
+### Lỗi 4: Firewall Oracle
+
+Log của bạn cho thấy **Coturn đang hoạt động hoàn hảo và sẵn sàng** (đã gán thành công cổng relay vào IP nội bộ `10.0.0.173`). 
+
+Tuy nhiên, việc **không xuất hiện thêm bất kỳ dòng log mới nào** khi bạn bấm test trên trình duyệt xác nhận rằng: **Gói tin từ trình duyệt của bạn hoàn toàn chưa chạm được tới phần mềm Coturn trên VM** (đã bị chặn ở lớp mạng trước đó).
+
+Oracle Linux 9 mặc định sử dụng **`firewalld`** quản lý tường lửa chứ không dùng `iptables` thô. Nếu `firewalld` đang bật, nó sẽ chặn toàn bộ cổng bất kể bạn đã cấu hình `iptables` thế nào.
+
+Bạn hãy kiểm tra và chạy các bước sau trên Oracle VM:
+
+##### Bước 1: Kiểm tra xem `firewalld` có đang hoạt động không
+Chạy lệnh:
+```bash
+sudo systemctl status firewalld
+```
+*   Nếu kết quả báo **`active (running)`**, hãy chạy các lệnh sau để mở cổng trên `firewalld` (lệnh này sẽ ghi đè và mở cổng triệt để):
+    ```bash
+    # Mở cổng STUN/TURN (TCP & UDP)
+    sudo firewall-cmd --permanent --add-port=3478/tcp
+    sudo firewall-cmd --permanent --add-port=3478/udp
+
+    # Mở dải cổng truyền media (UDP)
+    sudo firewall-cmd --permanent --add-port=49152-49200/udp
+
+    # Load lại cấu hình tường lửa để áp dụng ngay lập tức
+    sudo firewall-cmd --reload
+    ```
+
+---
+
+##### Bước 2: Test kết nối TCP bằng PowerShell máy Local (Máy Windows)
+Mở PowerShell trên máy tính cá nhân của bạn và gõ:
+```powershell
+Test-NetConnection -ComputerName 129.150.46.248 -Port 3478
+```
+*   **Nếu `TcpTestSucceeded : True`**: Chúc mừng bạn, cổng đã thông! Hãy thử chạy lại test trên Trickle ICE. Lúc này trên cửa sổ log của Coturn (`tail -f`) sẽ nhảy log liên tục.
+*   **Nếu vẫn `False`**: Bạn chưa mở cổng `3478` trên **OCI Security List** (tường lửa của Oracle Web Console). 
+
+---
+
+##### Bước 3: Xác nhận lại bản ghi Cloudflare
+Đảm bảo bạn không bật Proxy (Đám mây màu cam 🟠) cho tên miền `turn.socialhubzz.cloud`. 
+*   Nếu đang bật đám mây màu cam, hãy chuyển sang **DNS Only (Đám mây màu xám 🔘)**.
 
 ---
 
